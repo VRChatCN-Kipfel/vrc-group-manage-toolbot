@@ -236,3 +236,25 @@ async def _finish_login(matcher, client, result):
             await matcher.finish("登录成功但无法获取用户信息")
     else:
         await matcher.finish("登录失败，请检查 .env 中的配置")
+
+
+# 登录状态检查
+vrc_check = on_command("vrcCheck", priority=5)
+
+
+@vrc_check.handle()
+async def handle_vrc_check(bot: Bot, event: MessageEvent):
+    client = get_vrc_client()
+    if not client.config.auth_cookie:
+        await vrc_check.finish("❌ 未登录，请使用 #vrclLogin")
+        return
+
+    await vrc_check.send("正在检查登录状态...")
+    try:
+        user = await client.get_current_user()
+        if user:
+            await vrc_check.finish(f"✅ 已登录 | 用户: {user.displayName}")
+        else:
+            await vrc_check.finish("❌ 认证已过期，请使用 #vrclLogin 重新登录")
+    except Exception as e:
+        await vrc_check.finish(f"❌ 检查失败: {str(e)[:50]}")
