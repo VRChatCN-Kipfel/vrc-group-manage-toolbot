@@ -13,11 +13,13 @@ if __name__ == "__main__":
     driver = nonebot.get_driver()
     driver.register_adapter(Adapter)
     
-    # 加载内置插件
-    nonebot.load_builtin_plugins("echo")
+    @driver.on_shutdown
+    async def _shutdown():
+        from utils import get_vrc_client
+        await get_vrc_client().close()
     
     # 从 pyproject.toml 加载配置和插件
     nonebot.load_from_toml("pyproject.toml")
     
-    # 运行 bot
-    nonebot.run(app="bot:app")
+    # 运行 bot（不引用 bot:app，避免重复初始化）
+    nonebot.run()

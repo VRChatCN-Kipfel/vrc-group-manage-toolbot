@@ -1,0 +1,114 @@
+# 测试状态
+
+## 已通过测试 ✅
+
+| 功能 | 命令 | 状态 |
+|------|------|------|
+| 用户名密码登录 | `#vrclLogin` | ✅ 正常 |
+| 两步验证 | `#2fa 验证码` | ✅ 交互流程通 |
+| 登录状态检查 | `#vrcCheck` | ✅ 正常（v0.2.1 修复 FinishedException） |
+| Cookie 持久化 | 重启自动加载 | ✅ 重启免登录 |
+| 用户绑定 | `#bind` + `#confirm` | ✅ Bio 验证码流程通 |
+| 绑定信息查询 | `#bindinfo` | ✅ 正常 |
+| 绑定用户状态 | `#whois @某人` | ✅ 在线/离线/位置正确 |
+| 解绑 | `#unbind` | ✅ 二次确认正常（v0.2.1 修复提示变数插值） |
+| 强制绑定 | `#bind force @QQ usr_xxx` | ✅ 超管权限正常 |
+| 用户位置查询 | `#whereis usr_xxx` | ✅ 正常 |
+| 群组实例查询 | `#instances grp_xxx` | ✅ 正常 |
+| 群成员查询 | `#gmembers grp_xxx` | ✅ 分页正常（v0.2.1 修复长消息分段） |
+| 公告发布确认 | `#gannounce` | ✅ 提示正确（v0.2.1 修复模板插值；实际 POST 需 Owner/Mod） |
+| 命令前缀 | `#` | ✅ 正常触发，无需 @Bot |
+| NapCat 集成 | — | ✅ WebSocket 通信正常 |
+
+---
+
+## 部分通过 / 已知问题 ⚠️
+
+### Cookie 直登未可用
+
+| 命令 | 状态 |
+|------|------|
+| `#vrclLogin cookie=xxx` | ⚠️ 未通过 |
+
+**现象**：返回 401 `Cookie 无效或已过期`
+
+**原因**：`vrchat.com` 和 `api.vrchat.cloud` 的 cookie 不互通。浏览器从 `vrchat.com` 登录后，cookie 绑定在该域名下，对 `api.vrchat.cloud` 的请求无效。
+
+**待测试方案**：
+1. 从浏览器 DevTools → Network 中找到任意 `api.vrchat.cloud` 域下的请求，复制其 `Cookie: auth=xxx` 值
+2. 直接访问 `https://api.vrchat.cloud/api/1/auth/user`，从该页面的 Cookie 中复制
+
+---
+
+## 尚未测试 ❌
+
+### 群管理命令（12 个）
+
+> 需要：Bot 的 VRChat 账号是某个 VRChat 群组的 **Owner** 或 **Moderator**
+
+| 命令 | 功能 | 备注 |
+|------|------|------|
+| `#ginvite` | 邀请入群 | 需邀请权限 |
+| `#gkick` | 踢出成员 | 二次确认，需踢人权限 |
+| `#gban` | 封禁成员 | 二次确认，需管理权限 |
+| `#gunban` | 解封成员 | 需管理权限 |
+| `#grole` | 设置角色 | 模糊匹配，需 Owner 权限 |
+| `#grequests` | 入群申请列表 | 需管理权限 |
+| `#gaccept` | 批准申请 | 需管理权限 |
+| `#greject` | 拒绝申请 | 需管理权限 |
+| `#gdelannounce` | 删除公告 | 二次确认 |
+| `#gaudit` | 审核日志 | 最近 50 条 |
+
+### 管理员命令（部分）
+
+| 命令 | 功能 | 备注 |
+|------|------|------|
+| `#bind force @QQ usr_xxx` | 强制绑定 | 需超级用户 |
+
+### 稳定性
+
+| 场景 | 状态 |
+|------|------|
+| Bot 长时间运行 | ❌ 未测试（之前因 NapCat WebSocket 静默断连导致不响应，重启 NapCat 恢复正常） |
+| 多群同时服务 | ❌ 未测试 |
+| 429 限速恢复 | ⚠️ 触发后等半小时恢复，自动退避重试未完整验证 |
+| 并发命令处理 | ❌ 未测试 |
+| Cookie 过期后自动提示重新登录 | ❌ 未测试 |
+
+### 边界情况
+
+| 场景 | 状态 |
+|------|------|
+| 未登录时执行需要 API 的命令 | ⚠️ 代码已加 `check_vrc_auth()` + `api_guard` 401 提示，未实际验证 |
+| 不存在的用户 ID 查询 | ❌ 未测试 |
+| 不存在的群组 ID 查询 | ❌ 未测试 |
+| Bio 验证码大小写不匹配 | ❌ 未测试 |
+| Bio 验证码过期 | ❌ 未测试 |
+| VRChat 用户已被他人绑定 | ❌ 未测试 |
+| 重复绑定（已绑定用户再 bind） | ❌ 未测试 |
+| TOTP 验证码错误 | ❌ 未测试 |
+| 不同 QQ 群管理员权限隔离 | ❌ 未测试 |
+
+---
+
+## 测试环境
+
+| 项目 | 信息 |
+|------|------|
+| Bot QQ | ****** |
+| 测试群 | ****** (****) |
+| VRChat 账号 | ****** |
+| VRChat ID | usr_b2d06dbd-7a37-4732-a169-a2c76ac19d22 |
+| VRChat 群组 | grp_fdd4cdf6-b3e0-4be3-a040-5b8abf2617f4 (中文kipfel厅, 3975人) |
+| Bot 群组角色 | 待确认（需 Owner/Mod 方可测管理命令） |
+| NapCat QQ | 协议登录（Bot QQ 同号） |
+
+---
+
+## 下一步测试计划
+
+1. **Cookie 直登**：用正确的 `api.vrchat.cloud` 域 cookie 测试
+2. **群管理**：确认 Bot 群组角色权限后逐一测试 `#ginvite`/`#gkick`/`#gban`/`#gunban`/`#grole`/`#grequests`/`#gaccept`/`#greject`/`#gdelannounce`/`#gaudit`
+3. **权限边界**：用非管理员 QQ 号发管理命令，验证拒绝
+4. **长稳运行**：Bot 持续运行 24h+，确认无内存泄漏和连接中断
+5. **边界情况**：逐个验证边界场景

@@ -6,6 +6,7 @@ VRChat API 客户端
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -13,7 +14,10 @@ import httpx
 from nonebot import logger
 
 from .vrc_config import VRCConfig
-from .vrc_models import User, Instance, Group, World
+from .vrc_models import (
+    User, Instance, Group, World,
+    GroupMember, GroupRole, Announcement, JoinRequest, AuditLogEntry,
+)
 
 
 class VRCClient:
@@ -29,10 +33,25 @@ class VRCClient:
         self.config = config or VRCConfig.from_env()
         self.client: Optional[httpx.AsyncClient] = None
         self._authenticated = False
+        self._cookie_file = Path("data/auth_cookie.txt")
+    
+    def _save_cookie(self):
+        if self.config.auth_cookie:
+            self._cookie_file.parent.mkdir(parents=True, exist_ok=True)
+            self._cookie_file.write_text(self.config.auth_cookie)
+            logger.debug(f"Auth cookie saved to {self._cookie_file}")
+    
+    def _load_cookie(self):
+        if not self.config.auth_cookie and self._cookie_file.exists():
+            saved = self._cookie_file.read_text().strip()
+            if saved:
+                self.config.auth_cookie = saved
+                logger.info("Loaded saved auth cookie")
         
     async def _get_client(self) -> httpx.AsyncClient:
         """获取 HTTP 客户端"""
         if self.client is None:
+            self._load_cookie()
             headers = {
                 "User-Agent": "VRChat-Group-Manage-ToolBot/1.0",
                 "Accept": "application/json",
@@ -41,6 +60,9 @@ class VRCClient:
             # 如果有认证 cookie，添加到请求头
             if self.config.auth_cookie:
                 headers["Cookie"] = f"auth={self.config.auth_cookie}"
+                logger.info(f"Auth cookie loaded (len={len(self.config.auth_cookie)})")
+            else:
+                logger.debug("No auth cookie set")
             
             self.client = httpx.AsyncClient(
                 base_url=self.config.base_url,
@@ -50,6 +72,14 @@ class VRCClient:
         
         return self.client
     
+    async def _request(self, method: str, path: str, **kwargs) -> dict:
+        client = await self._get_client()
+        response = await client.request(method, path, **kwargs)
+        response.raise_for_status()
+        if response.status_code == 204:
+            return {}
+        return response.json()
+    
     async def close(self):
         """关闭客户端"""
         if self.client:
@@ -57,18 +87,80 @@ class VRCClient:
             self.client = None
             self._authenticated = False
     
-    async def login(self, username: Optional[str] = None, password: Optional[str] = None, 
-                   two_factor_code: Optional[str] = None) -> bool:
+    async def verify_2fa(self, tfa_code: str):
+        try:
+            user = self.config.username
+            pwd = self.config.password
+            if not user or not pwd:
+                return False
+            client = await self._get_client()
+            logger.info(f"Submitting 2FA code: {tfa_code}")
+            tfa_response = await client.post(
+                "/auth/twofactorauth/totp/verify",
+                json={"code": tfa_code},
+            )
+            logger.info(f"2FA verify status: {tfa_response.status_code}")
+            if tfa_response.status_code == 429:
+                logger.warning("2FA verify 429 rate limited, waiting 5s and retrying...")
+                await asyncio.sleep(5)
+                tfa_response = await client.post(
+                    "/auth/twofactorauth/totp/verify",
+                    json={"code": tfa_code},
+                )
+                logger.info(f"2FA verify retry status: {tfa_response.status_code}")
+            if tfa_response.status_code != 200:
+                logger.error(f"2FA verify non-200: {tfa_response.text[:200]}")
+                return False
+            twofa_cookie = tfa_response.cookies.get("twoFactorAuth")
+            if not twofa_cookie:
+                logger.error(f"No twoFactorAuth, cookies: {dict(tfa_response.cookies)}")
+                return False
+            logger.info(f"2FA verify passed, getting final auth cookie...")
+            final_client = httpx.AsyncClient(
+                base_url=self.config.base_url,
+                auth=httpx.BasicAuth(user, pwd),
+                headers={
+                    "User-Agent": "VRChat-Group-Manage-ToolBot/1.0",
+                    "Cookie": f"twoFactorAuth={twofa_cookie}",
+                },
+                timeout=self.config.timeout,
+            )
+            try:
+                final_response = await final_client.get("/auth/user")
+                logger.info(f"Final auth: {final_response.status_code}, "
+                           f"cookies={list(dict(final_response.cookies).keys())}")
+                if final_response.status_code == 200:
+                    final_cookie = final_response.cookies.get("auth")
+                    if final_cookie:
+                        self.config.auth_cookie = final_cookie
+                        self.client = None
+                        self._authenticated = True
+                        logger.success("VRChat API 登录成功（两步验证）")
+                        self._save_cookie()
+                        return True
+                    else:
+                        logger.error(f"No auth cookie: {dict(final_response.cookies)}")
+                else:
+                    logger.error(f"Final auth failed: {final_response.status_code}")
+            finally:
+                await final_client.aclose()
+            return False
+        except Exception as e:
+            logger.error(f"2FA exception: {e}")
+            return False
+
+    async def login(self, username: Optional[str] = None, password: Optional[str] = None):
         """
         登录 VRChat API
         
         Args:
             username: 用户名
             password: 密码
-            two_factor_code: 两步验证码
             
         Returns:
-            bool: 是否登录成功
+            True: 登录成功
+            "need_2fa": 需要两步验证
+            False: 登录失败
         """
         try:
             client = await self._get_client()
@@ -82,9 +174,9 @@ class VRCClient:
                 return False
             
             # 发送登录请求
-            response = await client.post(
+            response = await client.get(
                 "/auth/user",
-                data={"username": user, "password": pwd},
+                auth=(user, pwd),
             )
             
             if response.status_code == 200:
@@ -92,33 +184,24 @@ class VRCClient:
                 response_data = response.json()
                 
                 if response_data.get("requiresTwoFactorAuth"):
-                    if not two_factor_code and not self.config.two_factor_code:
-                        logger.warning("需要两步验证码")
-                        return False
-                    
-                    # 发送两步验证
-                    tfa_code = two_factor_code or self.config.two_factor_code
-                    tfa_response = await client.post(
-                        "/auth/twofactorauth/totp/verify",
-                        json={"code": tfa_code},
-                    )
-                    
-                    if tfa_response.status_code == 200:
-                        # 获取认证 cookie
-                        auth_cookie = tfa_response.cookies.get("auth")
-                        if auth_cookie:
-                            self.config.auth_cookie = auth_cookie
-                            self._authenticated = True
-                            logger.success("VRChat API 登录成功（含两步验证）")
-                            return True
+                    logger.info("需要两步验证码，请使用 #2fa <验证码>")
+                    return "need_2fa"
                 else:
                     # 不需要两步验证
                     auth_cookie = response.cookies.get("auth")
                     if auth_cookie:
                         self.config.auth_cookie = auth_cookie
-                        self._authenticated = True
-                        logger.success("VRChat API 登录成功")
-                        return True
+                    else:
+                        # 已通过 cookie 认证，无新 cookie 下发
+                        pass
+                    if not self.config.auth_cookie:
+                        logger.error("登录成功但未获取到认证 cookie")
+                        return False
+                    self.client = None
+                    self._authenticated = True
+                    logger.success("VRChat API 登录成功")
+                    self._save_cookie()
+                    return True
             
             logger.error(f"VRChat API 登录失败: {response.status_code}")
             return False
@@ -128,225 +211,180 @@ class VRCClient:
             return False
     
     async def get_current_user(self) -> Optional[User]:
-        """
-        获取当前用户信息
-        
-        Returns:
-            User: 用户信息，失败返回 None
-        """
         try:
-            client = await self._get_client()
-            response = await client.get("/auth/user")
-            
-            if response.status_code == 200:
-                return User(**response.json())
-            else:
-                logger.error(f"获取用户信息失败: {response.status_code}")
+            r = await self._request("GET", "/auth/user")
+            return User(**r)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
                 return None
-                
-        except Exception as e:
-            logger.error(f"获取用户信息异常: {e}")
-            return None
+            raise
     
     async def get_instance(self, instance_id: str) -> Optional[Instance]:
-        """
-        获取实例信息
-        
-        Args:
-            instance_id: 实例 ID
-            
-        Returns:
-            Instance: 实例信息，失败返回 None
-        """
         try:
-            client = await self._get_client()
-            response = await client.get(f"/instances/{instance_id}")
-            
-            if response.status_code == 200:
-                return Instance(**response.json())
-            else:
-                logger.error(f"获取实例信息失败: {response.status_code}")
+            r = await self._request("GET", f"/instances/{instance_id}")
+            return Instance(**r)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
                 return None
-                
-        except Exception as e:
-            logger.error(f"获取实例信息异常: {e}")
-            return None
+            raise
     
     async def get_group(self, group_id: str) -> Optional[Group]:
-        """
-        获取群组信息
-        
-        Args:
-            group_id: 群组 ID
-            
-        Returns:
-            Group: 群组信息，失败返回 None
-        """
         try:
-            client = await self._get_client()
-            response = await client.get(f"/groups/{group_id}")
-            
-            if response.status_code == 200:
-                return Group(**response.json())
-            else:
-                logger.error(f"获取群组信息失败: {response.status_code}")
+            r = await self._request("GET", f"/groups/{group_id}")
+            return Group(**r)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
                 return None
-                
-        except Exception as e:
-            logger.error(f"获取群组信息异常: {e}")
-            return None
+            raise
     
     async def get_group_instances(self, group_id: str) -> List[Instance]:
-        """
-        获取群组的实例列表
-        
-        Args:
-            group_id: 群组 ID
-            
-        Returns:
-            List[Instance]: 实例列表
-        """
-        try:
-            client = await self._get_client()
-            response = await client.get(
-                f"/groups/{group_id}/instances",
-                params={"offset": 0, "n": 50}
-            )
-            
-            if response.status_code == 200:
-                instances_data = response.json()
-                return [Instance(**data) for data in instances_data]
-            else:
-                logger.error(f"获取群组实例失败: {response.status_code}")
-                return []
-                
-        except Exception as e:
-            logger.error(f"获取群组实例异常: {e}")
-            return []
+        r = await self._request("GET", f"/groups/{group_id}/instances",
+                                params={"offset": 0, "n": 50})
+        return [Instance(**data) for data in r]
     
     async def get_world(self, world_id: str) -> Optional[World]:
-        """
-        获取世界信息
-        
-        Args:
-            world_id: 世界 ID
-            
-        Returns:
-            World: 世界信息，失败返回 None
-        """
         try:
-            client = await self._get_client()
-            response = await client.get(f"/worlds/{world_id}")
-            
-            if response.status_code == 200:
-                return World(**response.json())
-            else:
-                logger.error(f"获取世界信息失败: {response.status_code}")
+            r = await self._request("GET", f"/worlds/{world_id}")
+            return World(**r)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
                 return None
-                
-        except Exception as e:
-            logger.error(f"获取世界信息异常: {e}")
-            return None
+            raise
     
     async def get_user(self, user_id: str) -> Optional[User]:
-        """
-        获取用户信息
-        
-        Args:
-            user_id: 用户 ID
-            
-        Returns:
-            User: 用户信息，失败返回 None
-        """
         try:
-            client = await self._get_client()
-            response = await client.get(f"/users/{user_id}")
-            
-            if response.status_code == 200:
-                return User(**response.json())
-            else:
-                logger.error(f"获取用户信息失败: {response.status_code}")
+            r = await self._request("GET", f"/users/{user_id}")
+            return User(**r)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
                 return None
-                
-        except Exception as e:
-            logger.error(f"获取用户信息异常: {e}")
-            return None
+            raise
     
     async def join_instance(self, instance_id: str) -> bool:
-        """
-        加入实例（需要认证）
-        
-        Args:
-            instance_id: 实例 ID
-            
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            client = await self._get_client()
-            response = await client.put(f"/instances/{instance_id}/join")
-            
-            if response.status_code == 200:
-                logger.success(f"成功加入实例: {instance_id}")
-                return True
-            else:
-                logger.error(f"加入实例失败: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"加入实例异常: {e}")
-            return False
+        await self._request("PUT", f"/instances/{instance_id}/join")
+        return True
     
     async def leave_instance(self, instance_id: str) -> bool:
-        """
-        离开实例（需要认证）
-        
-        Args:
-            instance_id: 实例 ID
-            
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            client = await self._get_client()
-            response = await client.delete(f"/instances/{instance_id}/leave")
-            
-            if response.status_code == 200:
-                logger.success(f"成功离开实例: {instance_id}")
-                return True
-            else:
-                logger.error(f"离开实例失败: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"离开实例异常: {e}")
-            return False
+        await self._request("DELETE", f"/instances/{instance_id}/leave")
+        return True
     
     async def refresh_auth(self) -> bool:
-        """
-        刷新认证状态
-        
-        Returns:
-            bool: 是否成功
-        """
         try:
-            client = await self._get_client()
-            response = await client.get("/auth/user")
-            
-            if response.status_code == 200:
-                self._authenticated = True
-                logger.success("认证状态刷新成功")
-                return True
-            else:
-                self._authenticated = False
-                logger.warning("认证状态已过期")
-                return False
+            await self._request("GET", "/auth/user")
+            self._authenticated = True
+            return True
+        except httpx.HTTPStatusError:
+            self._authenticated = False
+            return False
                 
         except Exception as e:
             logger.error(f"刷新认证异常: {e}")
-            self._authenticated = False
             return False
     
+    async def get_group_members(self, group_id: str, n: int = 100, offset: int = 0) -> List[GroupMember]:
+        response = await self._request(
+            "GET", f"/groups/{group_id}/members",
+            params={"n": n, "offset": offset},
+        )
+        return [GroupMember(**item) for item in response]
+
+    async def get_group_member(self, group_id: str, user_id: str) -> Optional[GroupMember]:
+        try:
+            response = await self._request(
+                "GET", f"/groups/{group_id}/members/{user_id}",
+            )
+            return GroupMember(**response)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            raise
+
+    async def invite_user_to_group(self, group_id: str, user_id: str) -> dict:
+        return await self._request(
+            "POST", f"/groups/{group_id}/invite",
+            json={"userId": user_id},
+        )
+
+    async def kick_user_from_group(self, group_id: str, user_id: str) -> dict:
+        return await self._request(
+            "DELETE", f"/groups/{group_id}/members/{user_id}",
+        )
+
+    async def ban_user_from_group(self, group_id: str, user_id: str) -> dict:
+        return await self._request(
+            "POST", f"/groups/{group_id}/bans",
+            json={"userId": user_id},
+        )
+
+    async def unban_user_from_group(self, group_id: str, user_id: str) -> dict:
+        return await self._request(
+            "DELETE", f"/groups/{group_id}/bans/{user_id}",
+        )
+
+    async def get_group_roles(self, group_id: str) -> List[GroupRole]:
+        response = await self._request(
+            "GET", f"/groups/{group_id}/roles",
+        )
+        return [GroupRole(**item) for item in response]
+
+    async def update_member_role(self, group_id: str, user_id: str, role_ids: List[str]) -> dict:
+        return await self._request(
+            "PUT", f"/groups/{group_id}/members/{user_id}/roles",
+            json={"roleIds": role_ids},
+        )
+
+    async def get_group_announcements(self, group_id: str) -> List[Announcement]:
+        response = await self._request(
+            "GET", f"/groups/{group_id}/announcement",
+        )
+        return [Announcement(**item) for item in response]
+
+    async def create_group_announcement(self, group_id: str, title: str, text: str) -> dict:
+        return await self._request(
+            "POST", f"/groups/{group_id}/announcement",
+            json={"title": title, "text": text},
+        )
+
+    async def delete_group_announcement(self, group_id: str, announcement_id: str) -> dict:
+        return await self._request(
+            "DELETE", f"/groups/{group_id}/announcement/{announcement_id}",
+        )
+
+    async def get_group_join_requests(self, group_id: str) -> List[JoinRequest]:
+        response = await self._request(
+            "GET", f"/groups/{group_id}/requests",
+        )
+        return [JoinRequest(**item) for item in response]
+
+    async def respond_join_request(self, group_id: str, user_id: str, action: str) -> dict:
+        return await self._request(
+            "PUT", f"/groups/{group_id}/requests/{user_id}",
+            json={"action": action},
+        )
+
+    async def get_group_audit_logs(self, group_id: str, n: int = 50) -> List[AuditLogEntry]:
+        response = await self._request(
+            "GET", f"/groups/{group_id}/auditlog",
+            params={"n": n},
+        )
+        return [AuditLogEntry(**item) for item in response]
+
+    async def get_friends(self) -> list:
+        response = await self._request(
+            "GET", "/auth/user/friends",
+        )
+        return response if isinstance(response, list) else []
+
+    async def send_friend_request(self, user_id: str) -> dict:
+        return await self._request(
+            "POST", f"/user/{user_id}/friendRequest",
+        )
+
+    async def check_friend_status(self, user_id: str) -> dict:
+        return await self._request(
+            "GET", f"/user/{user_id}/friendStatus",
+        )
+
     @property
     def is_authenticated(self) -> bool:
         """检查是否已认证"""
