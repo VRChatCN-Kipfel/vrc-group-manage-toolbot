@@ -5,7 +5,6 @@ VRChat API 客户端
 """
 
 import asyncio
-import base64
 import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -117,13 +116,11 @@ class VRCClient:
                 logger.error(f"No twoFactorAuth, cookies: {dict(tfa_response.cookies)}")
                 return False
             logger.info(f"2FA verify passed, getting final auth cookie...")
-            auth_bytes = f"{user}:{pwd}".encode("utf-8")
-            auth_b64 = base64.b64encode(auth_bytes).decode()
             final_client = httpx.AsyncClient(
                 base_url=self.config.base_url,
+                auth=httpx.BasicAuth(user, pwd),
                 headers={
                     "User-Agent": "VRChat-Group-Manage-ToolBot/1.0",
-                    "Authorization": f"Basic {auth_b64}",
                     "Cookie": f"twoFactorAuth={twofa_cookie}",
                 },
                 timeout=self.config.timeout,
@@ -281,57 +278,7 @@ class VRCClient:
             return False
                 
         except Exception as e:
-            logger.error(f"加入实例异常: {e}")
-            return False
-    
-    async def leave_instance(self, instance_id: str) -> bool:
-        """
-        离开实例（需要认证）
-        
-        Args:
-            instance_id: 实例 ID
-            
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            client = await self._get_client()
-            response = await client.delete(f"/instances/{instance_id}/leave")
-            
-            if response.status_code == 200:
-                logger.success(f"成功离开实例: {instance_id}")
-                return True
-            else:
-                logger.error(f"离开实例失败: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"离开实例异常: {e}")
-            return False
-    
-    async def refresh_auth(self) -> bool:
-        """
-        刷新认证状态
-        
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            client = await self._get_client()
-            response = await client.get("/auth/user")
-            
-            if response.status_code == 200:
-                self._authenticated = True
-                logger.success("认证状态刷新成功")
-                return True
-            else:
-                self._authenticated = False
-                logger.warning("认证状态已过期")
-                return False
-                
-        except Exception as e:
             logger.error(f"刷新认证异常: {e}")
-            self._authenticated = False
             return False
     
     async def get_group_members(self, group_id: str, n: int = 100, offset: int = 0) -> List[GroupMember]:

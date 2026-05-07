@@ -3,6 +3,8 @@
 提供查询群组实例、用户状态等功能
 """
 
+import asyncio
+
 from nonebot import on_command, logger
 from nonebot.adapters.onebot.v11 import MessageEvent, Bot, Message
 from nonebot.params import CommandArg
@@ -62,7 +64,7 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
                     msg += f"   群组内: {inst.userCount} 人\n"
                     if inst.location and ":" in inst.location:
                         inst_ok, detail, _ = await api_guard.call_with_retry(
-                            get_vrc_client().get_instance, inst.location,
+                            client.get_instance, inst.location,
                             _endpoint="get_instance")
                         if inst_ok and detail:
                             cap = f"/{detail.capacity}" if detail.capacity else ""
@@ -132,7 +134,12 @@ vrc_login = on_command("vrclLogin", priority=5)
 # 两步验证命令
 vrc_2fa = on_command("2fa", priority=5)
 
-_pending_2fa: bool = False
+_pending_2fa_users: set[str] = set()
+
+
+async def _clear_2fa_after(user_id: str, seconds: int):
+    await asyncio.sleep(seconds)
+    _pending_2fa_users.discard(user_id)
 
 
 @vrc_login.handle()
@@ -186,7 +193,8 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
         return
 
     if result == "need_2fa":
-        _pending_2fa = True
+        _pending_2fa_users.add(str(event.user_id))
+        asyncio.create_task(_clear_2fa_after(str(event.user_id), 30))
         await vrc_login.send("⚠️ 需要两步验证 (TOTP)，请在 30 秒内使用 #2fa <6位验证码>")
         await vrc_login.finish()
         return
@@ -196,9 +204,10 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
 
 @vrc_2fa.handle()
 async def handle_vrc_2fa(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    global _pending_2fa
+    global _pending_2fa_users
 
-    if not _pending_2fa:
+    user_key = str(event.user_id)
+    if user_key not in _pending_2fa_users:
         await vrc_2fa.finish("当前没有待处理的两步验证，请先使用 #vrclLogin")
         return
 
@@ -214,11 +223,11 @@ async def handle_vrc_2fa(bot: Bot, event: MessageEvent, args: Message = CommandA
         result = await client.verify_2fa(code)
     except Exception as e:
         logger.error(f"VRChat 两步验证异常: {e}")
-        _pending_2fa = False
+        _pending_2fa_users.discard(user_key)
         await vrc_2fa.finish(f"验证失败: {str(e)}")
         return
 
-    _pending_2fa = False
+    _pending_2fa_users.discard(user_key)
     if result is True:
         await _finish_login(vrc_2fa, get_vrc_client(), True)
     else:
@@ -253,11 +262,14 @@ async def handle_vrc_check(bot: Bot, event: MessageEvent):
         return
 
     await vrc_check.send("正在检查登录状态...")
+    msg: str
     try:
         user = await client.get_current_user()
         if user:
-            await vrc_check.finish(f"✅ 已登录 | 用户: {user.displayName}")
+            msg = f"✅ 已登录 | 用户: {user.displayName}"
         else:
-            await vrc_check.finish("❌ 认证已过期，请使用 #vrclLogin 重新登录")
+            msg = "❌ 认证已过期，请使用 #vrclLogin 重新登录"
     except Exception as e:
-        await vrc_check.finish(f"❌ 检查失败: {str(e)[:50]}")
+        msg = f"❌ 检查失败: {str(e)[:50]}"
+
+    await vrc_check.finish(msg)
