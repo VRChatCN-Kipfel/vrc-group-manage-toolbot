@@ -8,7 +8,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, Bot
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 
-from ..utils import VRCClient, VRCConfig
+from utils import VRC
 
 
 # 创建命令处理器
@@ -17,15 +17,15 @@ user_location = on_command("whereis", rule=to_me(), priority=5)
 
 
 # 全局客户端实例（单例模式）
-_vrc_client: VRCClient = None
+_vrc_client: VRC.VRCClient = None
 
 
-def get_vrc_client() -> VRCClient:
+def get_vrc_client() -> VRC.VRCClient:
     """获取 VRChat 客户端实例（单例）"""
     global _vrc_client
     if _vrc_client is None:
-        config = VRCConfig.from_env()
-        _vrc_client = VRCClient(config)
+        config = VRC.VRCConfig.from_env()
+        _vrc_client = VRC.VRCClient(config)
     return _vrc_client
 
 
