@@ -58,15 +58,15 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
                 msg += f"活跃实例 ({len(instances)}个):\n\n"
                 for i, inst in enumerate(instances[:10], 1):
                     name = inst.worldName or inst.worldId or "未知"
-                    cap = f" (容量 {inst.capacity})" if inst.capacity else ""
-                    msg += f"{i}. {name}{cap}\n"
+                    msg += f"{i}. {name}\n"
                     msg += f"   群组内: {inst.userCount} 人\n"
                     if inst.location and ":" in inst.location:
                         inst_ok, detail, _ = await api_guard.call_with_retry(
                             get_vrc_client().get_instance, inst.location,
                             _endpoint="get_instance")
-                        if inst_ok and detail and detail.userCount > 0:
-                            msg += f"   在线: {detail.userCount} 人\n"
+                        if inst_ok and detail:
+                            cap = f"/{detail.capacity}" if detail.capacity else ""
+                            msg += f"   在线: {detail.userCount}{cap} 人\n"
                 if len(instances) > 10:
                     msg += f"... 还有 {len(instances) - 10} 个实例"
     except Exception as e:
