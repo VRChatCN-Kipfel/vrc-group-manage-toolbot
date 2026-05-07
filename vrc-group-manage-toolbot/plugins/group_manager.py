@@ -30,8 +30,6 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
     if not group_id:
         await group_instances.finish("请提供群组 ID\n用法: /instances grp_xxx")
     
-    await group_instances.send("正在查询群组实例...")
-
     msg = ""
     client = get_vrc_client()
     err = check_vrc_auth(client)
@@ -91,8 +89,6 @@ async def handle_user_location(bot: Bot, event: MessageEvent, args: Message = Co
     if not user_id:
         await user_location.finish("请提供用户 ID\n用法: /whereis usr_xxx")
     
-    await user_location.send("正在查询用户位置...")
-
     msg = ""
     client = get_vrc_client()
     err = check_vrc_auth(client)

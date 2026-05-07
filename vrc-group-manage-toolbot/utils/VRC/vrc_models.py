@@ -40,6 +40,12 @@ class Instance(BaseModel):
     instanceCreatorDisplayName: Optional[str] = None
     created_at: Optional[datetime] = None
     
+    @validator("n_users", pre=True, always=True)
+    def normalize_n_users(cls, v):
+        if isinstance(v, int):
+            return None
+        return v
+    
     @property
     def full_instance_id(self) -> str:
         return self.id
