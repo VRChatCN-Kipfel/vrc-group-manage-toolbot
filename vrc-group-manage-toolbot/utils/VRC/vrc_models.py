@@ -4,7 +4,7 @@ VRChat API 数据模型
 
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class User(BaseModel):
@@ -14,6 +14,8 @@ class User(BaseModel):
     username: Optional[str] = None
     status: Optional[str] = None
     state: Optional[str] = None
+    bio: Optional[str] = None
+    bioLinks: Optional[List[str]] = None
     avatarThumbnail: Optional[str] = None
     currentAvatar: Optional[str] = None
     location: Optional[str] = None
@@ -24,7 +26,7 @@ class User(BaseModel):
 
 class Instance(BaseModel):
     """实例模型"""
-    id: str
+    id: str = Field(alias="instanceId")
     name: Optional[str] = None
     worldId: Optional[str] = None
     worldName: Optional[str] = None
@@ -44,6 +46,7 @@ class Instance(BaseModel):
     
     class Config:
         extra = "allow"
+        populate_by_name = True
 
 
 class Group(BaseModel):
@@ -76,5 +79,58 @@ class World(BaseModel):
     thumbnailImageUrl: Optional[str] = None
     tags: Optional[List[str]] = []
     
+    class Config:
+        extra = "allow"
+
+
+class GroupMember(BaseModel):
+    id: str
+    groupId: str
+    userId: str
+    roleIds: List[str] = []
+    isRepresenting: bool = False
+    joinedAt: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
+
+class GroupRole(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    selfAssignable: bool = False
+    isManagement: bool = False
+    permissions: List[str] = []
+
+    class Config:
+        extra = "allow"
+
+
+class Announcement(BaseModel):
+    id: str
+    title: str
+    text: str
+    createdAt: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
+
+class JoinRequest(BaseModel):
+    userId: str
+    created_at: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
+
+class AuditLogEntry(BaseModel):
+    id: str
+    created_at: Optional[str] = None
+    description: Optional[str] = None
+    actorId: Optional[str] = None
+    targetId: Optional[str] = None
+
     class Config:
         extra = "allow"

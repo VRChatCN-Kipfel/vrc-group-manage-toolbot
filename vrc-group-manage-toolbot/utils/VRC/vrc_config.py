@@ -31,12 +31,12 @@ class VRCConfig(BaseModel):
         
     @classmethod
     def from_env(cls) -> "VRCConfig":
-        """从环境变量加载配置"""
-        import os
+        from nonebot import get_driver
+        cfg = get_driver().config
         return cls(
-            username=os.getenv("VRC_USERNAME"),
-            password=os.getenv("VRC_PASSWORD"),
-            auth_cookie=os.getenv("VRC_AUTH_COOKIE"),
-            timeout=int(os.getenv("VRC_TIMEOUT", "30")),
-            request_delay=int(os.getenv("VRC_REQUEST_DELAY", "1000")),
+            username=getattr(cfg, "vrc_username", None) or None,
+            password=getattr(cfg, "vrc_password", None) or None,
+            auth_cookie=getattr(cfg, "vrc_auth_cookie", None) or None,
+            timeout=int(getattr(cfg, "vrc_timeout", 30) or 30),
+            request_delay=int(getattr(cfg, "vrc_request_delay", 1000) or 1000),
         )

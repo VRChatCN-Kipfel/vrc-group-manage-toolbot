@@ -1,1 +1,10 @@
 .idea
+.kilo/plans/
+data/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.prod
+*.log
+.venv/
