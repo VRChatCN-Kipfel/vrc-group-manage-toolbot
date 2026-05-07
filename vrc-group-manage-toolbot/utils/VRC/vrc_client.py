@@ -194,11 +194,17 @@ class VRCClient:
                     auth_cookie = response.cookies.get("auth")
                     if auth_cookie:
                         self.config.auth_cookie = auth_cookie
-                        self.client = None
-                        self._authenticated = True
-                        logger.success("VRChat API 登录成功")
-                        self._save_cookie()
-                        return True
+                    else:
+                        # 已通过 cookie 认证，无新 cookie 下发
+                        pass
+                    if not self.config.auth_cookie:
+                        logger.error("登录成功但未获取到认证 cookie")
+                        return False
+                    self.client = None
+                    self._authenticated = True
+                    logger.success("VRChat API 登录成功")
+                    self._save_cookie()
+                    return True
             
             logger.error(f"VRChat API 登录失败: {response.status_code}")
             return False
