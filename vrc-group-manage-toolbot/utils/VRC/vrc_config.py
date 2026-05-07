@@ -34,9 +34,9 @@ class VRCConfig(BaseModel):
         from nonebot import get_driver
         cfg = get_driver().config
         return cls(
-            username=getattr(cfg, "vrc_username", None) or None,
-            password=getattr(cfg, "vrc_password", None) or None,
-            auth_cookie=getattr(cfg, "vrc_auth_cookie", None) or None,
-            timeout=int(getattr(cfg, "vrc_timeout", 30) or 30),
-            request_delay=int(getattr(cfg, "vrc_request_delay", 1000) or 1000),
+            username=getattr(cfg, "vrc_username", None),
+            password=getattr(cfg, "vrc_password", None),
+            auth_cookie=getattr(cfg, "vrc_auth_cookie", None),
+            timeout=int(getattr(cfg, "vrc_timeout", 30)),
+            request_delay=int(getattr(cfg, "vrc_request_delay", 1000)),
         )

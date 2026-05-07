@@ -32,7 +32,7 @@ class ApiGuard:
         return None
 
     def cache_set(self, key: str, value: Any, ttl: int = 60):
-        self._cache[key] = (value, time.time() + ttl)
+        self._cache[key] = (value, time.time() + float(ttl))
 
     async def call_with_retry(self, api_call, *args, **kwargs):
         endpoint = kwargs.pop("_endpoint", "unknown")

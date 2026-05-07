@@ -9,7 +9,10 @@ MAX_MESSAGE_LENGTH = 3800
 async def send_long_message(matcher: "Matcher", text: str):
     for i in range(0, len(text), MAX_MESSAGE_LENGTH):
         chunk = text[i : i + MAX_MESSAGE_LENGTH]
-        await matcher.send(chunk)
+        if i + MAX_MESSAGE_LENGTH >= len(text):
+            await matcher.finish(chunk)
+        else:
+            await matcher.send(chunk)
 
 
 def format_success(msg: str) -> str:

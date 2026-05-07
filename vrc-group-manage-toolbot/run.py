@@ -13,6 +13,11 @@ if __name__ == "__main__":
     driver = nonebot.get_driver()
     driver.register_adapter(Adapter)
     
+    @driver.on_shutdown
+    async def _shutdown():
+        from utils import get_vrc_client
+        await get_vrc_client().close()
+    
     # 从 pyproject.toml 加载配置和插件
     nonebot.load_from_toml("pyproject.toml")
     
