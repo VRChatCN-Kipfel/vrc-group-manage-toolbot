@@ -58,17 +58,9 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
                 msg += f"活跃实例 ({len(instances)}个):\n\n"
                 for i, inst in enumerate(instances[:10], 1):
                     name = inst.worldName or inst.worldId or "未知"
-                    msg += f"{i}. {name}\n"
+                    cap = f" (容量 {inst.capacity})" if inst.capacity else ""
+                    msg += f"{i}. {name}{cap}\n"
                     msg += f"   群组内: {inst.userCount} 人\n"
-                    # 通过 location 解析完整实例 ID，查询实际在线人数
-                    if inst.location and ":" in inst.location:
-                        parts = inst.location.split(":")
-                        if len(parts) >= 2:
-                            full_id = inst.location.split("~")[0] if "~" in inst.location else inst.location
-                            inst_ok, detail, _ = await api_guard.call_with_retry(
-                                get_vrc_client().get_instance, full_id, _endpoint="get_instance")
-                            if inst_ok and detail:
-                                msg += f"   在线: {detail.userCount}/{detail.capacity or '?'} 人\n"
                 if len(instances) > 10:
                     msg += f"... 还有 {len(instances) - 10} 个实例"
     except Exception as e:

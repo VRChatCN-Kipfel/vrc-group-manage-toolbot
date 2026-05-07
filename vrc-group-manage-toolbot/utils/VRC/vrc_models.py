@@ -68,6 +68,8 @@ class Instance(BaseModel):
             values["world"] = world.get("id", "")
             if not values.get("worldName") and world.get("name"):
                 values["worldName"] = world["name"]
+            if not values.get("capacity") and world.get("capacity"):
+                values["capacity"] = world["capacity"]
         return values
     
     @validator("location", pre=True, always=True)
