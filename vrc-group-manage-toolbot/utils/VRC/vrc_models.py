@@ -2,9 +2,9 @@
 VRChat API 数据模型
 """
 
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class User(BaseModel):
@@ -27,22 +27,39 @@ class User(BaseModel):
 class Instance(BaseModel):
     """实例模型"""
     id: str = Field(alias="instanceId")
-    name: Optional[str] = None
-    worldId: Optional[str] = None
+    worldId: str = Field(default="", alias="world")
     worldName: Optional[str] = None
     region: Optional[str] = None
-    groupId: Optional[str] = None
-    groupAccessType: Optional[str] = None  # public, plus, members
+    location: Optional[str] = None
+    userCount: int = Field(default=0, alias="memberCount")
     capacity: Optional[int] = None
-    userCount: Optional[int] = None
-    n_users: Optional[List[dict]] = []
+    groupId: Optional[str] = None
+    groupAccessType: Optional[str] = None
+    name: Optional[str] = None
+    n_users: Optional[List[dict]] = None
     instanceCreatorDisplayName: Optional[str] = None
     created_at: Optional[datetime] = None
     
     @property
     def full_instance_id(self) -> str:
-        """获取完整的实例 ID"""
         return self.id
+    
+    @property
+    def display_count(self) -> str:
+        cap = self.capacity or "?"
+        return f"{self.userCount}/{cap}"
+    
+    @validator("worldId", pre=True, always=True)
+    def extract_world_id(cls, v):
+        if isinstance(v, dict):
+            return v.get("id", v.get("worldId", ""))
+        return v or ""
+    
+    @validator("location", pre=True, always=True)
+    def extract_location(cls, v):
+        if isinstance(v, dict):
+            return v.get("location", v.get("instanceId", str(v)))
+        return v
     
     class Config:
         extra = "allow"

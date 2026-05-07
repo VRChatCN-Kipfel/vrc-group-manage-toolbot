@@ -7,6 +7,7 @@ VRChat API 客户端
 import asyncio
 import base64
 import json
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -33,10 +34,25 @@ class VRCClient:
         self.config = config or VRCConfig.from_env()
         self.client: Optional[httpx.AsyncClient] = None
         self._authenticated = False
+        self._cookie_file = Path("data/auth_cookie.txt")
+    
+    def _save_cookie(self):
+        if self.config.auth_cookie:
+            self._cookie_file.parent.mkdir(parents=True, exist_ok=True)
+            self._cookie_file.write_text(self.config.auth_cookie)
+            logger.debug(f"Auth cookie saved to {self._cookie_file}")
+    
+    def _load_cookie(self):
+        if not self.config.auth_cookie and self._cookie_file.exists():
+            saved = self._cookie_file.read_text().strip()
+            if saved:
+                self.config.auth_cookie = saved
+                logger.info("Loaded saved auth cookie")
         
     async def _get_client(self) -> httpx.AsyncClient:
         """获取 HTTP 客户端"""
         if self.client is None:
+            self._load_cookie()
             headers = {
                 "User-Agent": "VRChat-Group-Manage-ToolBot/1.0",
                 "Accept": "application/json",
@@ -123,6 +139,7 @@ class VRCClient:
                         self.client = None
                         self._authenticated = True
                         logger.success("VRChat API 登录成功（两步验证）")
+                        self._save_cookie()
                         return True
                     else:
                         logger.error(f"No auth cookie: {dict(final_response.cookies)}")
@@ -180,6 +197,7 @@ class VRCClient:
                         self.client = None
                         self._authenticated = True
                         logger.success("VRChat API 登录成功")
+                        self._save_cookie()
                         return True
             
             logger.error(f"VRChat API 登录失败: {response.status_code}")

@@ -59,10 +59,8 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
                 msg += f"在线成员: {group.onlineMemberCount or 'N/A'}\n\n"
                 msg += f"活跃实例 ({len(instances)}个):\n\n"
                 for i, inst in enumerate(instances[:10], 1):
-                    msg += f"{i}. {inst.worldName or '未知世界'}\n"
-                    msg += f"   人数: {inst.userCount}/{inst.capacity}\n"
-                    msg += f"   区域: {inst.region or 'N/A'}\n"
-                    msg += f"   类型: {inst.groupAccessType or 'N/A'}\n\n"
+                    msg += f"{i}. {inst.worldId or '未知世界'}\n"
+                    msg += f"   人数: {inst.display_count}\n"
                 if len(instances) > 10:
                     msg += f"... 还有 {len(instances) - 10} 个实例"
     except Exception as e:
@@ -164,6 +162,7 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
 
         if user:
             client._authenticated = True
+            client._save_cookie()
             await vrc_login.finish(f"登录成功！欢迎, {user.displayName}")
         else:
             client.config.auth_cookie = None
