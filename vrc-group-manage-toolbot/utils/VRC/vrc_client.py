@@ -61,7 +61,7 @@ class VRCClient:
             # 如果有认证 cookie，添加到请求头
             if self.config.auth_cookie:
                 headers["Cookie"] = f"auth={self.config.auth_cookie}"
-                logger.info(f"Auth cookie set, first 10 chars: {self.config.auth_cookie[:10]}...")
+                logger.info(f"Auth cookie loaded (len={len(self.config.auth_cookie)})")
             else:
                 logger.debug("No auth cookie set")
             
@@ -264,25 +264,21 @@ class VRCClient:
             raise
     
     async def join_instance(self, instance_id: str) -> bool:
-        """
-        加入实例（需要认证）
-        
-        Args:
-            instance_id: 实例 ID
-            
-        Returns:
-            bool: 是否成功
-        """
+        await self._request("PUT", f"/instances/{instance_id}/join")
+        return True
+    
+    async def leave_instance(self, instance_id: str) -> bool:
+        await self._request("DELETE", f"/instances/{instance_id}/leave")
+        return True
+    
+    async def refresh_auth(self) -> bool:
         try:
-            client = await self._get_client()
-            response = await client.put(f"/instances/{instance_id}/join")
-            
-            if response.status_code == 200:
-                logger.success(f"成功加入实例: {instance_id}")
-                return True
-            else:
-                logger.error(f"加入实例失败: {response.status_code}")
-                return False
+            await self._request("GET", "/auth/user")
+            self._authenticated = True
+            return True
+        except httpx.HTTPStatusError:
+            self._authenticated = False
+            return False
                 
         except Exception as e:
             logger.error(f"加入实例异常: {e}")

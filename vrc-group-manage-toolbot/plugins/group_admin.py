@@ -10,6 +10,12 @@ from services.message_utils import format_success, format_error, send_long_messa
 from services.group_config import group_config_store
 
 
+async def require_auth(matcher, client=None):
+    c = client or get_vrc_client()
+    if not c.config.auth_cookie:
+        await matcher.finish("⚠️ 尚未登录 VRChat API\n请先使用 #vrclLogin 或 #vrclLogin cookie=xxx")
+
+
 def resolve_group_id(text_parts: list, qq_group_id: str) -> str:
     if text_parts and text_parts[0].startswith("grp_"):
         return text_parts[0]
@@ -32,6 +38,8 @@ async def handle_gmembers(bot: Bot, event: GroupMessageEvent, state: T_State,
             "请提供群组ID",
             "/gmembers grp_xxx 或使用 /bot config 设置默认群组",
         ))
+
+    await require_auth(gmembers_cmd)
 
     page = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
 

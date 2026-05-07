@@ -14,12 +14,14 @@ class ApiGuard:
         self._last_request_time: float = 0
         self._cache: dict[str, tuple[Any, float]] = {}
         self._stats: dict[str, int] = defaultdict(int)
+        self._lock = asyncio.Lock()
 
     async def wait_if_needed(self):
-        elapsed = time.time() - self._last_request_time
-        if elapsed < self.min_interval:
-            await asyncio.sleep(self.min_interval - elapsed)
-        self._last_request_time = time.time()
+        async with self._lock:
+            elapsed = time.time() - self._last_request_time
+            if elapsed < self.min_interval:
+                await asyncio.sleep(self.min_interval - elapsed)
+            self._last_request_time = time.time()
 
     def cache_get(self, key: str) -> Optional[Any]:
         if key in self._cache:

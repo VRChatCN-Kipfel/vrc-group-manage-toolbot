@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from pydantic import BaseModel
+from nonebot import logger
 from nonebot_plugin_localstore import get_data_dir
 
 
@@ -21,10 +22,14 @@ class GroupConfigStore:
 
     def _load(self):
         if self._file.exists():
-            data = json.loads(self._file.read_text(encoding="utf-8"))
-            self._configs = {
-                k: GroupConfig(**v) for k, v in data.items()
-            }
+            try:
+                data = json.loads(self._file.read_text(encoding="utf-8"))
+                self._configs = {
+                    k: GroupConfig(**v) for k, v in data.items()
+                }
+            except (json.JSONDecodeError, Exception) as e:
+                logger.error(f"Failed to load group configs, resetting: {e}")
+                self._configs = {}
 
     def _save(self):
         self._file.parent.mkdir(parents=True, exist_ok=True)
