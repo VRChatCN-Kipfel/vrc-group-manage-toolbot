@@ -4,7 +4,7 @@ VRChat API 数据模型
 
 from typing import Optional, List, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 
 
 class User(BaseModel):
@@ -54,6 +54,15 @@ class Instance(BaseModel):
         if isinstance(v, dict):
             return v.get("id", v.get("worldId", ""))
         return v or ""
+    
+    @root_validator(pre=True)
+    def normalize_world_dict(cls, values):
+        world = values.get("world")
+        if isinstance(world, dict):
+            values["world"] = world.get("id", "")
+            if not values.get("worldName") and world.get("name"):
+                values["worldName"] = world["name"]
+        return values
     
     @validator("location", pre=True, always=True)
     def extract_location(cls, v):
