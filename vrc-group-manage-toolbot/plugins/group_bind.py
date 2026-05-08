@@ -28,6 +28,11 @@ async def handle_bindgroup(bot: Bot, event: GroupMessageEvent | PrivateMessageEv
         await _handle_query(bot, event)
         return
     
+    # 情况1b：私聊中传入纯数字 QQ 群号 → 查询该群绑定状态
+    if isinstance(event, PrivateMessageEvent) and text.isdigit():
+        await _handle_query(bot, event, qq_group_id=text)
+        return
+    
     # 情况2：解绑操作（仅超管可用）
     if text.lower() in ("unbind", "--unbind", "-u"):
         level = await get_permission_level(bot, event)
@@ -53,12 +58,14 @@ async def handle_bindgroup(bot: Bot, event: GroupMessageEvent | PrivateMessageEv
     await _handle_bind(bot, event, text)
 
 
-async def _handle_query(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent):
+async def _handle_query(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent, qq_group_id: str = None):
     """处理查询请求"""
     
     if isinstance(event, GroupMessageEvent):
         # 群聊中查询
         qq_group_id = str(event.group_id)
+    
+    if not qq_group_id:
         config = group_config_store.get(qq_group_id)
         
         if not config.default_vrc_group:
@@ -92,16 +99,35 @@ async def _handle_query(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent
 async def _handle_unbind(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent, qq_group_id: str = None):
     """处理解绑操作"""
     
-    if isinstance(event, GroupMessageEvent):
-        # 群聊中解绑
-        qq_group_id = str(event.group_id)
-    
     if not qq_group_id:
-        # 私聊中解绑，需要指定 QQ 群号
+        # 私聊中查询，需要指定 QQ 群号
         await bindgroup_cmd.finish(format_error(
-            "私聊解绑需要指定 QQ 群号",
-            "用法: #bindgroup unbind <QQ群号>"
+            "私聊查询需要指定 QQ 群号",
+            "用法: #bindgroup <QQ群号>"
         ))
+    
+    config = group_config_store.get(qq_group_id)
+    
+    if not config.default_vrc_group:
+        await bindgroup_cmd.finish(format_error(
+            f"QQ 群 {qq_group_id} 尚未绑定 VRChat 群组",
+            "请联系管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    vrc_group_id = config.default_vrc_group
+    bound_qq_groups = group_config_store.get_by_vrc_group(vrc_group_id)
+    
+    msg = f"🔗 群组绑定信息\n"
+    msg += "─" * 24 + "\n"
+    msg += f"VRChat 群组: {vrc_group_id}\n"
+    msg += f"已绑定 QQ 群 ({len(bound_qq_groups)}个):\n"
+    
+    for qq_id in bound_qq_groups:
+        is_group_chat = isinstance(event, GroupMessageEvent)
+        marker = " ← 当前" if is_group_chat and qq_id == str(event.group_id) else ""
+        msg += f"  • {qq_id}{marker}\n"
+    
+    await send_long_message(bindgroup_cmd, msg)
     
     config = group_config_store.get(qq_group_id)
     
