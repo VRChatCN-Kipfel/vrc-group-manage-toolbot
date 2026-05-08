@@ -84,9 +84,31 @@
 示例：
 ```
 #bot permission whereis user        # 所有人都可查询位置
-#bot permission gban admin          # 仅群管理员可封禁
+#bot permission gban owner          # 仅群主可封禁
 #bot permission bind 2              # 仅超管可绑定（用数字）
 ```
+
+### 临时权限管理 (v0.2.3+)
+**注意：以下设置仅在 Bot 本次运行期间生效，重启后自动清除。**
+
+#### 设定临时权限
+```
+#bot settemppermission @QQ号 <权限等级>
+```
+示例：
+```bash
+# 紧急剥夺某管理员的权限
+#bot settemppermission @捣乱的管理 0
+
+# 临时授权某人协助管理
+#bot settemppermission @热心成员 bound_admin
+```
+
+#### 查看临时权限列表
+```
+#bot temppermissions
+```
+显示当前所有被临时修改过权限的用户及其等级。
 
 ### 重置配置
 ```

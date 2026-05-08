@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.2.3 — 2026-05-08
+
+### 🚀 新增功能
+
+#### 临时权限管理系统
+- **新增内存级权限覆盖功能** (`services/permission.py`)
+  - `set_temp_permission(qq_id, level)`：为指定用户设置临时权限等级
+  - `clear_temp_permission(qq_id)`：清除指定用户的临时权限
+  - `get_all_temp_permissions()`：获取当前所有临时权限设置
+  - **优先级最高**：临时权限在身份识别时优先于 QQ 身份和绑定状态生效
+
+- **新增配置管理子命令** (`plugins/config_manager.py`)
+  - `#bot settemppermission @QQ <权限>`：临时设定某人权限（重启失效）
+    - 安全限制：禁止通过此命令赋予 Lv5 (SUPERUSER) 权限
+  - `#bot temppermissions`：查看当前所有临时权限设置列表
+
+### 💡 使用场景
+1. **紧急降级**：管理员账号异常时，立即运行 `#bot settemppermission @捣乱的管理 0` 剥夺其权限
+2. **临时授权**：给热心成员临时开放管理权限 `#bot settemppermission @热心成员 3`
+3. **权限审计**：通过 `#bot temppermissions` 随时检查当前的特权名单
+
+---
+
 ## v0.2.2 — 2026-05-08
 
 ### 🚀 新增功能

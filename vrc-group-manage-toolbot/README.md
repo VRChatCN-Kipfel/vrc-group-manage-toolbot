@@ -118,6 +118,8 @@ python run.py
 | `#bot enable <命令>` | `#bot enable gban` | 启用指定命令 |
 | `#bot disable <命令>` | `#bot disable gkick` | 禁用指定命令 |
 | `#bot permission <命令> <权限>` | `#bot permission whereis user` | 设置命令权限 |
+| `#bot settemppermission @QQ <权限>` | `#bot settemppermission @某人 3` | 临时设定某人权限 (重启失效) |
+| `#bot temppermissions` | 直接发 | 查看所有临时权限设置 |
 | `#bot reset [命令]` | `#bot reset` 或 `#bot reset gban` | 重置配置 |
 
 **权限等级**: 
