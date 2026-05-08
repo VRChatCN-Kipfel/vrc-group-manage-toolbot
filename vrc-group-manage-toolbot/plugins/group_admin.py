@@ -22,17 +22,16 @@ def resolve_group_id(event: GroupMessageEvent, text_parts: list = None) -> str:
     - 群聊中：强制使用已绑定的默认群组，忽略任何传入的 grp_xxx 参数
     - 私聊中：允许超管通过参数指定群组
     """
-    # 群聊中强制使用绑定的群组
-    if isinstance(event, GroupMessageEvent):
-        config = group_config_store.get(str(event.group_id))
-        if not config.default_vrc_group:
-            return None  # 未绑定群组
-        return config.default_vrc_group
-    
-    # 私聊中（理论上不应该到达这里，因为所有指令都限制为 GroupMessageEvent）
-    if text_parts and text_parts[0].startswith("grp_"):
-        return text_parts[0]
-    return None
+    config = group_config_store.get(str(event.group_id))
+    if not config.default_vrc_group:
+        return None
+    return config.default_vrc_group
+
+
+def skip_grp_prefix(parts: list) -> None:
+    """过滤掉以 grp_ 开头的第一个参数（兼容旧格式）"""
+    if parts and parts[0].startswith("grp_"):
+        parts.pop(0)
 
 
 # ── gmembers ──
@@ -113,6 +112,7 @@ async def handle_ginvite(bot: Bot, event: GroupMessageEvent, args: Message = Com
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -163,6 +163,7 @@ async def handle_gkick_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -219,6 +220,7 @@ async def handle_gban_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -274,6 +276,7 @@ async def handle_gunban(bot: Bot, event: GroupMessageEvent, args: Message = Comm
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -322,13 +325,8 @@ async def handle_grole(bot: Bot, event: GroupMessageEvent, args: Message = Comma
         await grole_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    if len(parts) < 2:
-        await grole_cmd.finish(format_error(
-            "参数不足",
-            "用法: #grole <用户ID> <角色名>",
-        ))
-
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -339,6 +337,12 @@ async def handle_grole(bot: Bot, event: GroupMessageEvent, args: Message = Comma
             ))
         else:
             await grole_cmd.finish(format_error("无法获取群组信息，请稍后重试"))
+    
+    if len(parts) < 2:
+        await grole_cmd.finish(format_error(
+            "参数不足",
+            "用法: #grole <用户ID> <角色名>",
+        ))
 
     user_id = parts[0]
     role_name = " ".join(parts[1:])
@@ -446,6 +450,7 @@ async def handle_gaccept(bot: Bot, event: GroupMessageEvent, args: Message = Com
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -496,6 +501,7 @@ async def handle_greject(bot: Bot, event: GroupMessageEvent, args: Message = Com
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))
@@ -617,6 +623,7 @@ async def handle_gdelannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_S
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(event, parts)
+    skip_grp_prefix(parts)
     
     if not group_id:
         config = group_config_store.get(str(event.group_id))

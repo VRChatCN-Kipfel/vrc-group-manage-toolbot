@@ -36,6 +36,15 @@ async def handle_bindgroup(bot: Bot, event: GroupMessageEvent | PrivateMessageEv
         await _handle_unbind(bot, event)
         return
     
+    # 情况2b：私聊解绑指定群 #bindgroup unbind <QQ群号>
+    parts = text.split()
+    if parts[0].lower() in ("unbind", "--unbind", "-u") and len(parts) > 1:
+        level = await get_permission_level(bot, event)
+        if level < PermissionLevel.SUPERUSER:
+            await bindgroup_cmd.finish(format_error("解绑操作需要机器人超级管理员权限"))
+        await _handle_unbind(bot, event, qq_group_id=parts[1])
+        return
+    
     # 情况3：绑定操作（仅超管可用）
     level = await get_permission_level(bot, event)
     if level < PermissionLevel.SUPERUSER:
@@ -76,39 +85,39 @@ async def _handle_query(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent
         # 私聊中查询，需要指定 QQ 群号
         await bindgroup_cmd.finish(format_error(
             "私聊查询需要指定 QQ 群号",
-            "用法: #bindgroup [QQ群号]"
+            "用法: #bindgroup <QQ群号>"
         ))
 
 
-async def _handle_unbind(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent):
+async def _handle_unbind(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent, qq_group_id: str = None):
     """处理解绑操作"""
     
     if isinstance(event, GroupMessageEvent):
         # 群聊中解绑
         qq_group_id = str(event.group_id)
-        config = group_config_store.get(qq_group_id)
-        
-        if not config.default_vrc_group:
-            await bindgroup_cmd.finish(format_error(
-                "当前群聊尚未绑定任何 VRChat 群组",
-                "无需解绑"
-            ))
-        
-        vrc_group_id = config.default_vrc_group
-        config.default_vrc_group = None
-        group_config_store.set(config)
-        
-        await bindgroup_cmd.finish(format_success(
-            f"已解除当前群聊与 VRChat 群组 {vrc_group_id} 的绑定"
+    
+    if not qq_group_id:
+        # 私聊中解绑，需要指定 QQ 群号
+        await bindgroup_cmd.finish(format_error(
+            "私聊解绑需要指定 QQ 群号",
+            "用法: #bindgroup unbind <QQ群号>"
         ))
     
-    else:
-        # 私聊中解绑，这个场景不太合理，因为私聊没有上下文
-        # 如果需要支持私聊解绑指定群，可以扩展为 #bindgroup unbind <QQ群号>
+    config = group_config_store.get(qq_group_id)
+    
+    if not config.default_vrc_group:
         await bindgroup_cmd.finish(format_error(
-            "私聊中无法直接解绑",
-            "请在目标 QQ 群中使用 #bindgroup unbind，或使用 #bindgroup <grp_xxx> <QQ群号> 重新绑定到其他群组"
+            f"QQ 群 {qq_group_id} 尚未绑定任何 VRChat 群组",
+            "无需解绑"
         ))
+    
+    vrc_group_id = config.default_vrc_group
+    config.default_vrc_group = None
+    group_config_store.set(config)
+    
+    await bindgroup_cmd.finish(format_success(
+        f"已解除 QQ 群 {qq_group_id} 与 VRChat 群组 {vrc_group_id} 的绑定"
+    ))
 
 
 async def _handle_bind(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent, text: str):
