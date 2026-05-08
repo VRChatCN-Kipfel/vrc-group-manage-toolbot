@@ -6,9 +6,10 @@
 
 | 模块 | 命令数 | 说明 |
 |------|--------|------|
-| 查询 | 3 | 用户位置、群实例、世界信息 |
+| 查询 | 2 | 用户位置、群实例 |
 | 群管理 | 12 | 成员/角色/公告/审核/封禁管理 |
 | 用户绑定 | 5 | QQ↔VRChat 账号绑定与查询 |
+| 群组绑定 | 1 | QQ 群与 VRChat 群组绑定管理 |
 | 系统 | 3 | 登录、两步验证、Cookie 直登 |
 
 ---
@@ -76,8 +77,10 @@ python run.py
 | 命令 | 用法 | 说明 |
 |------|------|------|
 | `#whereis <用户ID>` | `#whereis usr_xxx` | 查用户在线状态和位置 |
-| `#instances <群ID>` | `#instances grp_xxx` | 查群组活跃实例 |
+| `#instances` | 群聊中直接发送 | 查**当前群绑定**的 VRChat 群组活跃实例 |
 | `#whois @某人` | `#whois @QQ用户` | 查已绑定 QQ 用户的 VRChat 状态 |
+
+> **注意**：`#instances` 在群聊中自动使用已绑定的 VRChat 群组，无需指定 `grp_xxx`。
 
 ### 用户绑定
 
@@ -89,24 +92,35 @@ python run.py
 | `#unbind` | 直接发 | 已绑定用户 | 解绑（需二次确认） |
 | `#bindinfo [@某人]` | `#bindinfo` | 任何人 | 查绑定状态 |
 
+### 群组绑定（超级管理员专用）
+
+| 命令 | 用法 | 权限 | 说明 |
+|------|------|------|------|
+| `#bindgroup` | 群聊中直接发送 | 任何人 | 查询当前群绑定的 VRChat 群组 |
+| `#bindgroup <群ID>` | `#bindgroup grp_xxx` | 超管 | 将当前群绑定到指定 VRChat 群组 |
+| `#bindgroup unbind` | 群聊中发送 | 超管 | 解除当前群的绑定 |
+| `#bindgroup <群ID> <QQ号>` | 私聊中发送 | 超管 | 为指定 QQ 群绑定 VRChat 群组 |
+
+> **重要**：所有群组管理指令都基于已绑定的 VRChat 群组，**不允许**在群聊中通过参数指定其他群组，防止越权操作。
+
 ### 群管理（需 QQ 群管理员权限 + Bot 有 VRChat 群管理权限）
 
 | 命令 | 用法 | 说明 |
 |------|------|------|
-| `#gmembers <群ID> [页]` | `#gmembers grp_xxx` | 分页查看群成员（20人/页） |
-| `#ginvite <群ID> <用户ID>` | `#ginvite grp_xxx usr_xxx` | 邀请入群 |
-| `#gkick <群ID> <用户ID>` | `#gkick grp_xxx usr_xxx` | 踢出成员（二次确认） |
-| `#gban <群ID> <用户ID>` | `#gban grp_xxx usr_xxx` | 封禁成员（二次确认） |
-| `#gunban <群ID> <用户ID>` | `#gunban grp_xxx usr_xxx` | 解封成员 |
-| `#grole <群ID> <用户ID> <角色>` | `#grole grp_xxx usr_xxx moderator` | 设置角色（模糊匹配） |
-| `#grequests <群ID>` | `#grequests grp_xxx` | 查看入群申请 |
-| `#gaccept <群ID> <用户ID>` | `#gaccept grp_xxx usr_xxx` | 批准入群申请 |
-| `#greject <群ID> <用户ID>` | `#greject grp_xxx usr_xxx` | 拒绝入群申请 |
-| `#gannounce <群ID>\n<标题>\n<内容>` | 多行命令 | 发布公告（二次确认） |
-| `#gdelannounce <群ID> <公告ID>` | `#gdelannounce grp_xxx ann_xxx` | 删除公告（二次确认） |
-| `#gaudit <群ID>` | `#gaudit grp_xxx` | 查看审核日志（最近50条） |
+| `#gmembers [页]` | `#gmembers` 或 `#gmembers 2` | 分页查看**当前群绑定**的群组成员（20人/页） |
+| `#ginvite <用户ID>` | `#ginvite usr_xxx` | 邀请用户加入**当前群绑定**的群组 |
+| `#gkick <用户ID>` | `#gkick usr_xxx` | 从**当前群绑定**的群组踢出成员（二次确认） |
+| `#gban <用户ID>` | `#gban usr_xxx` | 封禁**当前群绑定**的群组成员（二次确认） |
+| `#gunban <用户ID>` | `#gunban usr_xxx` | 解封**当前群绑定**的群组成员 |
+| `#grole <用户ID> <角色>` | `#grole usr_xxx moderator` | 为**当前群绑定**的群组设置角色（模糊匹配） |
+| `#grequests` | 直接发送 | 查看**当前群绑定**的群组入群申请 |
+| `#gaccept <用户ID>` | `#gaccept usr_xxx` | 批准**当前群绑定**的群组入群申请 |
+| `#greject <用户ID>` | `#greject usr_xxx` | 拒绝**当前群绑定**的群组入群申请 |
+| `#gannounce` | `#gannounce`<br>`标题`<br>`内容` | 在**当前群绑定**的群组发布公告（多行命令，二次确认） |
+| `#gdelannounce <公告ID>` | `#gdelannounce ann_xxx` | 删除**当前群绑定**的群组公告（二次确认） |
+| `#gaudit` | 直接发送 | 查看**当前群绑定**的群组审核日志（最近50条） |
 
-> 设置默认群组后，所有命令可省略 `<群ID>` 参数（使用 `#bot config` 设置）。
+> **安全策略**：所有群组管理指令在群聊中**强制使用**已绑定的 VRChat 群组，即使命令中携带 `grp_xxx` 参数也会被忽略。这确保了 QQ 群管理员只能管理当前群绑定的 VRChat 群组，防止越权操作。
 
 ---
 
@@ -123,7 +137,8 @@ vrc-group-manage-toolbot/
 ├── plugins/                # 命令插件
 │   ├── group_manager.py    # 查询命令 + 登录/2FA
 │   ├── group_admin.py      # 群管理命令（12个）
-│   └── user_bind.py        # 用户绑定命令（5个）
+│   ├── user_bind.py        # 用户绑定命令（5个）
+│   └── group_bind.py       # 群组绑定命令（新增）
 │
 ├── services/               # 服务层（插件 ↔ 后端）
 │   ├── api_guard.py        # 速率控制 + 指数退避 + 缓存
@@ -152,6 +167,8 @@ vrc-group-manage-toolbot/
 - **遵守 VRChat 使用条款**：频繁批量操作可能导致账号被封
 - **Cookie 是敏感凭据**，不要在群聊中公开分享
 - **BIO 验证码 3 分钟自动过期**，过时需重新绑定
+- **群组绑定安全**：群聊中所有管理指令强制使用已绑定的 VRChat 群组，防止越权操作
+- **私聊权限控制**：仅超级管理员可在私聊中使用 Bot，普通用户私聊会被拒绝
 
 ---
 

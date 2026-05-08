@@ -1,5 +1,94 @@
 # Changelog
 
+## v0.3.0 — 2026-05-08
+
+### 🚀 重大安全升级：群组绑定模型全面转换
+
+#### 核心变更
+
+**群聊中完全禁止携带 `grp_xxx` 参数** - 所有群组管理指令强制使用已绑定的 VRChat 群组，防止越权操作。
+
+这一变更解决了关键安全问题：
+- ❌ **修复前**：QQ 群管理员 A 可通过 `#gkick grp_乙群 usr_xxx` 管理乙群
+- ✅ **修复后**：所有指令自动使用当前 QQ 群绑定的 VRChat 群组，参数被忽略
+
+#### 新增功能
+
+- **新增 `plugins/group_bind.py`** — QQ 群与 VRChat 群组绑定管理系统
+  - `#bindgroup` 查询当前群绑定状态（任何人可用）
+  - `#bindgroup <grp_xxx>` 绑定当前群到指定 VRChat 群组（仅超管）
+  - `#bindgroup unbind` 解除当前群绑定（仅超管）
+  - `#bindgroup <grp_xxx> <QQ号>` 私聊中为指定群绑定（仅超管）
+  - 支持一个 VRChat 群组绑定到多个 QQ 群
+  - 一个 QQ 群只能绑定到一个 VRChat 群组（唯一性约束）
+
+- **新增 `services/group_config.get_by_vrc_group()`** — 反向查询方法
+  - 根据 VRChat 群组 ID 查找所有绑定的 QQ 群
+  - 用于 `#bindgroup` 查询时显示关联的 QQ 群列表
+
+#### 指令行为变更
+
+**群组管理指令（12个）** - 移除 `grp_xxx` 参数支持：
+
+| 指令 | 原用法 | 新用法（群聊） |
+|------|--------|--------------|
+| `#gmembers` | `#gmembers grp_xxx [页]` | `#gmembers [页]` |
+| `#ginvite` | `#ginvite grp_xxx usr_xxx` | `#ginvite usr_xxx` |
+| `#gkick` | `#gkick grp_xxx usr_xxx` | `#gkick usr_xxx` |
+| `#gban` | `#gban grp_xxx usr_xxx` | `#gban usr_xxx` |
+| `#gunban` | `#gunban grp_xxx usr_xxx` | `#gunban usr_xxx` |
+| `#grole` | `#grole grp_xxx usr_xxx 角色` | `#grole usr_xxx 角色` |
+| `#grequests` | `#grequests grp_xxx` | `#grequests` |
+| `#gaccept` | `#gaccept grp_xxx usr_xxx` | `#gaccept usr_xxx` |
+| `#greject` | `#greject grp_xxx usr_xxx` | `#greject usr_xxx` |
+| `#gannounce` | `#gannounce grp_xxx\n标题\n内容` | `#gannounce\n标题\n内容` |
+| `#gdelannounce` | `#gdelannounce grp_xxx ann_xxx` | `#gdelannounce ann_xxx` |
+| `#gaudit` | `#gaudit grp_xxx` | `#gaudit` |
+
+**查询指令**：
+- `#instances` - 群聊中自动显示当前群绑定的 VRChat 群组实例，私聊中超管可指定 `grp_xxx`
+
+#### 技术实现
+
+- **重构 `resolve_group_id()` 函数**
+  - 群聊中：强制返回已绑定的 `default_vrc_group`，忽略任何传入参数
+  - 私聊中：理论上不应到达（所有指令限制为 `GroupMessageEvent`）
+  
+- **简化参数解析逻辑**
+  - 移除复杂的 `user_arg_idx` 索引计算
+  - 所有指令统一从 `parts[0]` 开始读取用户参数
+  - 代码量减少约 30%，可读性提升
+
+- **增强错误提示**
+  - 未绑定群组时：明确提示联系超管使用 `#bindgroup` 绑定
+  - 所有指令用法提示已更新，移除 `grp_xxx` 参数说明
+
+#### 私聊权限控制
+
+- **所有指令添加私聊超管检查**
+  - `#instances`, `#whereis` - 私聊中仅超管可用
+  - `#vrclLogin`, `#2fa`, `#vrcCheck` - 私聊中仅超管可用
+  - 普通用户私聊会被拒绝，防止滥用 API
+
+#### 迁移指南
+
+**超级管理员首次使用前必须执行**：
+```bash
+# 在目标 QQ 群中
+#bindgroup grp_xxxxxxxx
+```
+
+**之后所有管理操作都基于绑定的群组**：
+```bash
+#gmembers              # 查看绑定的群组成员
+#gkick usr_xyz         # 从绑定的群组踢人
+#gannounce             # 在绑定的群组发布公告
+标题
+内容
+```
+
+---
+
 ## v0.2.1 — 2026-05-08
 
 ### 🐛 修复
