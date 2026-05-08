@@ -7,7 +7,7 @@ from nonebot import on_command, logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message
 from nonebot.params import CommandArg
 
-from services.permission import get_permission_level, PermissionLevel, check_command_permission
+from services.permission import get_permission_level, PermissionLevel, check_command_permission, set_temp_permission, clear_temp_permission, get_all_temp_permissions
 from services.message_utils import format_success, format_error, send_long_message
 from services.group_config import group_config_store, COMMAND_DEFAULTS
 
@@ -26,6 +26,7 @@ async def handle_config(bot: Bot, event: GroupMessageEvent, args: Message = Comm
     
     text = args.extract_plain_text().strip()
     parts = text.split()
+    raw_msg = event.get_message()
     
     if not parts:
         # 显示帮助信息
@@ -38,6 +39,8 @@ async def handle_config(bot: Bot, event: GroupMessageEvent, args: Message = Comm
             "#bot enable <命令> - 启用命令\n"
             "#bot disable <命令> - 禁用命令\n"
             "#bot permission <命令> <权限> - 设置权限\n"
+            "#bot settemppermission @QQ <权限> - 临时设定某人权限 (重启失效)\n"
+            "#bot temppermissions - 查看所有临时权限设置\n"
             "#bot reset [命令] - 重置配置\n\n"
             "权限等级:\n"
             "  0/unbound_user - 未绑定成员\n"
@@ -73,6 +76,15 @@ async def handle_config(bot: Bot, event: GroupMessageEvent, args: Message = Comm
     elif subcmd == "reset":
         cmd_name = parts[1] if len(parts) > 1 else None
         await handle_reset(bot, event, cmd_name)
+    elif subcmd == "settemppermission":
+        if len(parts) < 3:
+            await config_cmd.finish(format_error(
+                "参数不足",
+                "用法: #bot settemppermission @QQ <权限等级>"
+            ))
+        await handle_set_temp_permission(bot, event, raw_msg, parts[2])
+    elif subcmd == "temppermissions":
+        await handle_show_temp_permissions(bot, event)
     else:
         await config_cmd.finish(format_error(f"未知子命令: {subcmd}", "使用 #bot 查看帮助"))
 
@@ -257,3 +269,68 @@ async def handle_reset(bot: Bot, event: GroupMessageEvent, cmd_name: str = None)
         group_config_store.set(config)
         
         await config_cmd.finish(format_success("已重置所有命令配置为默认值"))
+
+
+async def handle_set_temp_permission(bot: Bot, event: GroupMessageEvent, raw_msg: Message, perm_str: str):
+    """设置临时权限"""
+    # 提取 @QQ
+    at_qq = None
+    for seg in raw_msg:
+        if seg.type == "at":
+            qq = seg.data.get("qq", "")
+            if qq and qq != "all":
+                at_qq = str(qq)
+                break
+    
+    if not at_qq:
+        await config_cmd.finish(format_error("请 @ 要设置权限的用户"))
+    
+    # 解析权限等级
+    try:
+        perm_level = PermissionLevel.from_str(perm_str)
+    except (ValueError, KeyError):
+        await config_cmd.finish(format_error(
+            f"无效的权限等级: {perm_str}",
+            "有效值: 0/unbound_user, 1/bound_user, 2/unbound_admin, 3/bound_admin, 4/owner, 5/superuser"
+        ))
+    
+    # 安全限制：不能通过此命令将自己或他人的权限提升到 SUPERUSER
+    if perm_level >= PermissionLevel.SUPERUSER and at_qq not in bot.config.superusers:
+        await config_cmd.finish(format_error("禁止通过此命令赋予超级管理员权限"))
+    
+    set_temp_permission(at_qq, perm_level)
+    
+    perm_names = {
+        0: "未绑定成员", 1: "已绑定成员", 
+        2: "未绑定管理", 3: "已绑定管理", 
+        4: "群主", 5: "超管"
+    }
+    await config_cmd.finish(
+        format_success(f"已临时设置 QQ {at_qq} 的权限为: {perm_names.get(perm_level.value, '未知')} (重启后失效)")
+    )
+
+
+async def handle_show_temp_permissions(bot: Bot, event: GroupMessageEvent):
+    """显示所有临时权限设置"""
+    temp_perms = get_all_temp_permissions()
+    
+    if not temp_perms:
+        await config_cmd.finish("✨ 当前没有设置任何临时权限")
+    
+    msg = f"📋 临时权限列表 (共 {len(temp_perms)} 人)\n"
+    msg += "─" * 30 + "\n"
+    
+    perm_names = {
+        0: "未绑定成员", 1: "已绑定成员", 
+        2: "未绑定管理", 3: "已绑定管理", 
+        4: "群主", 5: "超管"
+    }
+    
+    for qq_id, level in sorted(temp_perms.items()):
+        level_name = perm_names.get(level.value, "未知")
+        msg += f"• QQ: {qq_id}\n"
+        msg += f"  临时权限: {level_name} (Lv{level.value})\n\n"
+    
+    msg += "💡 提示: 这些设置仅在本次运行期间有效，重启 Bot 后将自动清除。"
+    
+    await send_long_message(config_cmd, msg)

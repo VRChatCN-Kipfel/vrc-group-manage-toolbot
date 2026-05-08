@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Dict
 
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 
@@ -29,12 +29,20 @@ class PermissionLevel(IntEnum):
         return mapping.get(level_str.lower(), cls.UNBOUND_USER)
 
 
+# 临时权限存储: {qq_id: PermissionLevel}
+_temp_permissions: Dict[str, PermissionLevel] = {}
+
+
 async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> PermissionLevel:
     from .user_binding import user_binding_store
     
     user_id = event.user_id
     sender = event.sender
     qq_id = str(user_id)
+    
+    # 0. 检查是否有临时设定的权限 (优先级最高)
+    if qq_id in _temp_permissions:
+        return _temp_permissions[qq_id]
     
     # 1. 检查是否为机器人超管 (Lv5)
     if qq_id in bot.config.superusers:
@@ -59,6 +67,21 @@ async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> Permission
         return PermissionLevel.BOUND_USER
     else:
         return PermissionLevel.UNBOUND_USER
+
+
+def set_temp_permission(qq_id: str, level: PermissionLevel):
+    """设置临时权限（仅本次运行生效）"""
+    _temp_permissions[str(qq_id)] = level
+
+
+def clear_temp_permission(qq_id: str):
+    """清除临时权限"""
+    _temp_permissions.pop(str(qq_id), None)
+
+
+def get_all_temp_permissions() -> Dict[str, PermissionLevel]:
+    """获取所有临时权限设置"""
+    return _temp_permissions.copy()
 
 
 async def check_vrc_group_role(
