@@ -10,41 +10,42 @@ from .permission import PermissionLevel
 # 定义所有可用的命令及其默认配置
 COMMAND_DEFAULTS = {
     # 系统/认证模块
-    "vrclLogin": {"enabled": True, "permission": PermissionLevel.USER},
-    "2fa": {"enabled": True, "permission": PermissionLevel.USER},
-    "vrcCheck": {"enabled": True, "permission": PermissionLevel.USER},
+    "vrclLogin": {"enabled": True, "permission": PermissionLevel.SUPERUSER},
+    "2fa": {"enabled": True, "permission": PermissionLevel.SUPERUSER},
+    "vrcCheck": {"enabled": True, "permission": PermissionLevel.SUPERUSER},
     
     # 查询模块
-    "whereis": {"enabled": True, "permission": PermissionLevel.USER},
-    "instances": {"enabled": True, "permission": PermissionLevel.USER},
-    "whois": {"enabled": True, "permission": PermissionLevel.USER},
+    "whereis": {"enabled": False, "permission": PermissionLevel.BOUND_ADMIN},
+    "instances": {"enabled": True, "permission": PermissionLevel.UNBOUND_USER},
+    "whois": {"enabled": False, "permission": PermissionLevel.BOUND_ADMIN},
     
     # 用户绑定模块
-    "bind": {"enabled": True, "permission": PermissionLevel.USER},
-    "confirm": {"enabled": True, "permission": PermissionLevel.USER},
-    "unbind": {"enabled": True, "permission": PermissionLevel.USER},
-    "bindinfo": {"enabled": True, "permission": PermissionLevel.USER},
+    "bind": {"enabled": False, "permission": PermissionLevel.UNBOUND_USER},
+    "confirm": {"enabled": False, "permission": PermissionLevel.UNBOUND_USER},
+    "unbind": {"enabled": False, "permission": PermissionLevel.BOUND_USER},
+    "bindinfo": {"enabled": True, "permission": PermissionLevel.BOUND_ADMIN},
     
-    # 群组管理模块
-    "gmembers": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "ginvite": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gkick": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gban": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gunban": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "grole": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "grequests": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gaccept": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "greject": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gannounce": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gdelannounce": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
-    "gaudit": {"enabled": True, "permission": PermissionLevel.GROUP_ADMIN},
+    # 群组管理模块 (建议至少是已绑定管理员)
+
+    "gmembers": {"enabled": False, "permission": PermissionLevel.BOUND_ADMIN},
+    "ginvite": {"enabled": False, "permission": PermissionLevel.BOUND_ADMIN},
+    "gkick": {"enabled": False, "permission": PermissionLevel.OWNER},
+    "gban": {"enabled": False, "permission": PermissionLevel.OWNER},
+    "gunban": {"enabled": False, "permission": PermissionLevel.OWNER},
+    "grole": {"enabled": True, "permission": PermissionLevel.OWNER},
+    "grequests": {"enabled": True, "permission": PermissionLevel.UNBOUND_ADMIN},
+    "gaccept": {"enabled": True, "permission": PermissionLevel.BOUND_ADMIN},
+    "greject": {"enabled": True, "permission": PermissionLevel.BOUND_ADMIN},
+    "gannounce": {"enabled": False, "permission": PermissionLevel.OWNER},
+    "gdelannounce": {"enabled": False, "permission": PermissionLevel.OWNER},
+    "gaudit": {"enabled": False, "permission": PermissionLevel.OWNER},
 }
 
 
 class CommandConfig(BaseModel):
     """单个命令的配置"""
     enabled: bool = True
-    permission: int = Field(default=0, ge=0, le=2)  # 0=USER, 1=GROUP_ADMIN, 2=SUPERUSER
+    permission: int = Field(default=0, ge=0, le=5)  # 0-5 对应新的6级权限体系
     
     def get_permission_level(self) -> PermissionLevel:
         return PermissionLevel(self.permission)

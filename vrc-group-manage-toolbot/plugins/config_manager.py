@@ -40,9 +40,12 @@ async def handle_config(bot: Bot, event: GroupMessageEvent, args: Message = Comm
             "#bot permission <命令> <权限> - 设置权限\n"
             "#bot reset [命令] - 重置配置\n\n"
             "权限等级:\n"
-            "  0/user - 普通用户\n"
-            "  1/admin - 群管理员\n"
-            "  2/superuser - 超级管理员"
+            "  0/unbound_user - 未绑定成员\n"
+            "  1/bound_user   - 已绑定成员\n"
+            "  2/unbound_admin - 未绑定管理员\n"
+            "  3/bound_admin  - 已绑定管理员\n"
+            "  4/owner        - 群主\n"
+            "  5/superuser    - 超级管理员"
         )
         await config_cmd.finish(help_msg)
     
@@ -98,7 +101,11 @@ async def handle_status(bot: Bot, event: GroupMessageEvent):
         msg += "─" * 30 + "\n"
         for cmd_name, cmd_config in sorted(modified_cmds)[:20]:
             status = "✅" if cmd_config.enabled else "❌"
-            perm_names = {0: "用户", 1: "管理", 2: "超管"}
+            perm_names = {
+                0: "未绑定成员", 1: "已绑定成员", 
+                2: "未绑定管理", 3: "已绑定管理", 
+                4: "群主", 5: "超管"
+            }
             perm = perm_names.get(cmd_config.permission, "?")
             msg += f"  {status} #{cmd_name} (权限: {perm})\n"
         
@@ -133,7 +140,11 @@ async def handle_list(bot: Bot, event: GroupMessageEvent):
             cmd_config = config.commands.get(cmd_name)
             if cmd_config:
                 status = "✅" if cmd_config.enabled else "❌"
-                perm_names = {0: "用户", 1: "管理", 2: "超管"}
+                perm_names = {
+                    0: "未绑定成员", 1: "已绑定成员", 
+                    2: "未绑定管理", 3: "已绑定管理", 
+                    4: "群主", 5: "超管"
+                }
                 perm = perm_names.get(cmd_config.permission, "?")
                 
                 # 标记与默认不同的配置
@@ -200,7 +211,7 @@ async def handle_permission(bot: Bot, event: GroupMessageEvent, cmd_name: str, p
     except (ValueError, KeyError):
         await config_cmd.finish(format_error(
             f"无效的权限等级: {perm_str}",
-            "有效值: 0/user, 1/admin, 2/superuser"
+            "有效值: 0/unbound_user, 1/bound_user, 2/unbound_admin, 3/bound_admin, 4/owner, 5/superuser"
         ))
     
     # 不允许降低 bot 命令的权限
@@ -211,7 +222,11 @@ async def handle_permission(bot: Bot, event: GroupMessageEvent, cmd_name: str, p
     config.set_command_permission(cmd_name, perm_level)
     group_config_store.set(config)
     
-    perm_names = {0: "普通用户", 1: "群管理员", 2: "超级管理员"}
+    perm_names = {
+        0: "未绑定成员", 1: "已绑定成员", 
+        2: "未绑定管理员", 3: "已绑定管理员", 
+        4: "群主", 5: "超级管理员"
+    }
     await config_cmd.finish(
         format_success(f"已设置 #{cmd_name} 的权限为: {perm_names.get(perm_level.value, '未知')}")
     )

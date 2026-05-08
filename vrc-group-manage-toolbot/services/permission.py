@@ -8,35 +8,57 @@ if TYPE_CHECKING:
 
 
 class PermissionLevel(IntEnum):
-    USER = 0
-    GROUP_ADMIN = 1
-    SUPERUSER = 2
+    UNBOUND_USER = 0      # 未绑定普通成员
+    BOUND_USER = 1        # 已绑定普通成员
+    UNBOUND_ADMIN = 2     # 未绑定管理员
+    BOUND_ADMIN = 3       # 已绑定管理员
+    OWNER = 4             # 群主
+    SUPERUSER = 5         # 机器人超级管理员
     
     @classmethod
     def from_str(cls, level_str: str) -> "PermissionLevel":
         """从字符串转换为权限等级"""
         mapping = {
-            "user": cls.USER,
-            "admin": cls.GROUP_ADMIN,
-            "superuser": cls.SUPERUSER,
-            "0": cls.USER,
-            "1": cls.GROUP_ADMIN,
-            "2": cls.SUPERUSER,
+            "unbound_user": cls.UNBOUND_USER, "0": cls.UNBOUND_USER,
+            "bound_user": cls.BOUND_USER, "1": cls.BOUND_USER,
+            "unbound_admin": cls.UNBOUND_ADMIN, "2": cls.UNBOUND_ADMIN,
+            "bound_admin": cls.BOUND_ADMIN, "3": cls.BOUND_ADMIN,
+            "owner": cls.OWNER, "4": cls.OWNER,
+            "superuser": cls.SUPERUSER, "5": cls.SUPERUSER,
         }
-        return mapping.get(level_str.lower(), cls.USER)
+        return mapping.get(level_str.lower(), cls.UNBOUND_USER)
 
 
 async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> PermissionLevel:
+    from .user_binding import user_binding_store
+    
     user_id = event.user_id
-
-    if str(user_id) in bot.config.superusers:
-        return PermissionLevel.SUPERUSER
-
     sender = event.sender
-    if sender.role in ("admin", "owner"):
-        return PermissionLevel.GROUP_ADMIN
-
-    return PermissionLevel.USER
+    qq_id = str(user_id)
+    
+    # 1. 检查是否为机器人超管 (Lv5)
+    if qq_id in bot.config.superusers:
+        return PermissionLevel.SUPERUSER
+    
+    # 2. 检查是否为群主 (Lv4)
+    if sender.role == "owner":
+        return PermissionLevel.OWNER
+    
+    # 3. 检查是否为管理员 (Lv2 or Lv3)
+    if sender.role == "admin":
+        # 检查是否已绑定
+        binding = user_binding_store.get_by_qq(qq_id)
+        if binding and binding.confirmed:
+            return PermissionLevel.BOUND_ADMIN
+        else:
+            return PermissionLevel.UNBOUND_ADMIN
+    
+    # 4. 检查普通成员 (Lv0 or Lv1)
+    binding = user_binding_store.get_by_qq(qq_id)
+    if binding and binding.confirmed:
+        return PermissionLevel.BOUND_USER
+    else:
+        return PermissionLevel.UNBOUND_USER
 
 
 async def check_vrc_group_role(
@@ -102,8 +124,11 @@ async def check_command_permission(
     # 检查权限等级
     if user_level < required_level:
         level_names = {
-            PermissionLevel.USER: "普通用户",
-            PermissionLevel.GROUP_ADMIN: "群管理员",
+            PermissionLevel.UNBOUND_USER: "未绑定成员",
+            PermissionLevel.BOUND_USER: "已绑定成员",
+            PermissionLevel.UNBOUND_ADMIN: "未绑定管理员",
+            PermissionLevel.BOUND_ADMIN: "已绑定管理员",
+            PermissionLevel.OWNER: "群主",
             PermissionLevel.SUPERUSER: "超级管理员",
         }
         return False, f"❌ 权限不足：需要{level_names.get(required_level, '未知')}权限"
