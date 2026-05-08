@@ -1,5 +1,71 @@
 # Changelog
 
+## v0.2.2 — 2026-05-08
+
+### 🚀 新增功能
+
+#### 动态配置系统
+- **新增 `plugins/config_manager.py`** — 配置管理插件（仅超级管理员）
+  - `#bot` 显示帮助信息
+  - `#bot status` 查看当前群配置状态
+  - `#bot list` 列出所有可配置命令
+  - `#bot enable/disable <命令>` 启用/禁用命令
+  - `#bot permission <命令> <权限>` 设置权限等级
+  - `#bot reset [命令]` 重置配置
+
+#### 细粒度权限控制
+- **扩展 `services/group_config.py`**
+  - 新增 `CommandConfig` 模型：单个命令的配置（enabled + permission）
+  - 新增 `COMMAND_DEFAULTS`：24个命令的默认配置
+  - `GroupConfig` 新增 `commands` 字段：存储每个命令的独立配置
+  - 新增方法：`is_command_enabled()`, `get_command_permission()`, `set_command_enabled()`, `set_command_permission()`
+
+- **扩展 `services/permission.py`**
+  - 新增 `PermissionLevel.from_str()`：从字符串转换权限等级
+  - 新增 `check_command_permission()`：统一的权限检查函数
+    - 检查功能是否启用
+    - 检查用户权限等级
+    - 返回 (是否允许, 错误消息)
+
+#### 全插件权限集成
+- **更新所有插件**：添加统一的权限检查
+  - `plugins/group_admin.py`：12个管理命令全部接入权限系统
+  - `plugins/user_bind.py`：5个绑定命令接入权限系统
+  - `plugins/group_manager.py`：查询命令接入权限系统
+  - 替换原有的硬编码权限检查为 `check_command_permission()`
+
+### 🔧 改进
+
+- **按群独立配置**：每个QQ群有独立的命令开关和权限设置
+- **默认配置自动填充**：新群或新命令自动获得合理的默认值
+- **配置持久化**：所有修改立即保存到 `data/vrc_toolbot/group_configs.json`
+- **友好的错误提示**：权限不足时明确告知需要的权限等级
+- **文档完善**：新增 `CONFIG_GUIDE.md` 详细使用说明
+
+### 📁 文件变更
+
+```
++(新增) plugins/config_manager.py       # 配置管理插件
++(新增) CONFIG_GUIDE.md                 # 配置系统使用指南
+M services/group_config.py              # 扩展命令配置功能
+M services/permission.py                # 新增权限检查函数
+M services/__init__.py                  # 导出新组件
+M plugins/group_admin.py                # 集成权限检查
+M plugins/user_bind.py                  # 集成权限检查
+M plugins/group_manager.py              # 集成权限检查
+M README.md                             # 更新文档
+```
+
+### 💡 使用场景
+
+1. **临时禁用功能**：`#bot disable instances`（API故障时）
+2. **提高敏感操作权限**：`#bot permission gban superuser`
+3. **开放查询功能**：`#bot permission whereis user`
+4. **批量关闭管理**：逐个 `#bot disable gxxx` 命令
+5. **快速恢复默认**：`#bot reset`
+
+---
+
 ## v0.2.1 — 2026-05-08
 
 ### 🐛 修复

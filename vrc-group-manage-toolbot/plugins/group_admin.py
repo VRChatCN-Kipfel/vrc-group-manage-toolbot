@@ -5,7 +5,7 @@ from nonebot.typing import T_State
 
 from utils import get_vrc_client, ensure_vrc_auth
 from services.api_guard import api_guard
-from services.permission import get_permission_level, PermissionLevel
+from services.permission import get_permission_level, PermissionLevel, check_command_permission
 from services.message_utils import format_success, format_error, send_long_message
 from services.group_config import group_config_store
 
@@ -31,6 +31,11 @@ gmembers_cmd = on_command("gmembers", priority=5, block=True)
 @gmembers_cmd.handle()
 async def handle_gmembers(bot: Bot, event: GroupMessageEvent, state: T_State,
                           args: Message = CommandArg()):
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gmembers")
+    if not allowed:
+        await gmembers_cmd.finish(error_msg)
+    
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
     if not group_id:
@@ -84,9 +89,10 @@ ginvite_cmd = on_command("ginvite", priority=5, block=True)
 
 @ginvite_cmd.handle()
 async def handle_ginvite(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await ginvite_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "ginvite")
+    if not allowed:
+        await ginvite_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -124,9 +130,10 @@ gkick_cmd = on_command("gkick", priority=5, block=True)
 @gkick_cmd.handle()
 async def handle_gkick_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                            args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gkick_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gkick")
+    if not allowed:
+        await gkick_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -170,9 +177,10 @@ gban_cmd = on_command("gban", priority=5, block=True)
 @gban_cmd.handle()
 async def handle_gban_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                           args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gban_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gban")
+    if not allowed:
+        await gban_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -215,9 +223,10 @@ gunban_cmd = on_command("gunban", priority=5, block=True)
 
 @gunban_cmd.handle()
 async def handle_gunban(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gunban_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gunban")
+    if not allowed:
+        await gunban_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -254,9 +263,10 @@ grole_cmd = on_command("grole", priority=5, block=True)
 
 @grole_cmd.handle()
 async def handle_grole(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await grole_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "grole")
+    if not allowed:
+        await grole_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     if len(parts) < 2:
@@ -327,9 +337,10 @@ grequests_cmd = on_command("grequests", priority=5, block=True)
 
 @grequests_cmd.handle()
 async def handle_grequests(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await grequests_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "grequests")
+    if not allowed:
+        await grequests_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -374,9 +385,10 @@ gaccept_cmd = on_command("gaccept", priority=5, block=True)
 
 @gaccept_cmd.handle()
 async def handle_gaccept(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gaccept_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gaccept")
+    if not allowed:
+        await gaccept_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -414,9 +426,10 @@ greject_cmd = on_command("greject", priority=5, block=True)
 
 @greject_cmd.handle()
 async def handle_greject(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await greject_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "greject")
+    if not allowed:
+        await greject_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -455,9 +468,10 @@ gannounce_cmd = on_command("gannounce", priority=5, block=True)
 @gannounce_cmd.handle()
 async def handle_gannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                                args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gannounce_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gannounce")
+    if not allowed:
+        await gannounce_cmd.finish(error_msg)
 
     text = args.extract_plain_text().strip()
     lines = text.split("\n", 1)
@@ -528,9 +542,10 @@ gdelannounce_cmd = on_command("gdelannounce", priority=5, block=True)
 @gdelannounce_cmd.handle()
 async def handle_gdelannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                                   args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gdelannounce_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gdelannounce")
+    if not allowed:
+        await gdelannounce_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))
@@ -574,9 +589,10 @@ gaudit_cmd = on_command("gaudit", priority=5, block=True)
 
 @gaudit_cmd.handle()
 async def handle_gaudit(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gaudit_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gaudit")
+    if not allowed:
+        await gaudit_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
     group_id = resolve_group_id(parts, str(event.group_id))

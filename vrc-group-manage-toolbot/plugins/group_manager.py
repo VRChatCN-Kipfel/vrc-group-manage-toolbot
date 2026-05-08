@@ -12,6 +12,7 @@ from nonebot.params import CommandArg
 from utils import get_vrc_client, check_vrc_auth
 from services.api_guard import api_guard
 from services.message_utils import format_error
+from services.permission import check_command_permission
 
 
 # 创建命令处理器
@@ -27,6 +28,11 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
     查询群组的活跃实例
     用法: /instances <group_id>
     """
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "instances")
+    if not allowed:
+        await group_instances.finish(error_msg)
+    
     group_id = args.extract_plain_text().strip()
     
     if not group_id:
@@ -84,6 +90,11 @@ async def handle_user_location(bot: Bot, event: MessageEvent, args: Message = Co
     查询用户当前位置
     用法: /whereis <user_id>
     """
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "whereis")
+    if not allowed:
+        await user_location.finish(error_msg)
+    
     user_id = args.extract_plain_text().strip()
     
     if not user_id:

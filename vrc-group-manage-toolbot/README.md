@@ -108,6 +108,22 @@ python run.py
 
 > 设置默认群组后，所有命令可省略 `<群ID>` 参数（使用 `#bot config` 设置）。
 
+### ⚙️ 配置管理（仅超级管理员）
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `#bot` | 直接发 | 显示帮助信息 |
+| `#bot status` | 直接发 | 查看当前群配置状态 |
+| `#bot list` | 直接发 | 列出所有可配置命令 |
+| `#bot enable <命令>` | `#bot enable gban` | 启用指定命令 |
+| `#bot disable <命令>` | `#bot disable gkick` | 禁用指定命令 |
+| `#bot permission <命令> <权限>` | `#bot permission whereis user` | 设置命令权限 |
+| `#bot reset [命令]` | `#bot reset` 或 `#bot reset gban` | 重置配置 |
+
+**权限等级**: `0/user` (普通用户), `1/admin` (群管理员), `2/superuser` (超级管理员)
+
+详细文档请查看 [CONFIG_GUIDE.md](./CONFIG_GUIDE.md)
+
 ---
 
 ## 项目结构
@@ -123,7 +139,8 @@ vrc-group-manage-toolbot/
 ├── plugins/                # 命令插件
 │   ├── group_manager.py    # 查询命令 + 登录/2FA
 │   ├── group_admin.py      # 群管理命令（12个）
-│   └── user_bind.py        # 用户绑定命令（5个）
+│   ├── user_bind.py        # 用户绑定命令（5个）
+│   └── config_manager.py   # 配置管理（新增）
 │
 ├── services/               # 服务层（插件 ↔ 后端）
 │   ├── api_guard.py        # 速率控制 + 指数退避 + 缓存
@@ -168,11 +185,33 @@ vrc-group-manage-toolbot/
 
 ## 权限体系
 
+### 基础权限等级
+
 | 等级 | 身份 | 权限 |
 |------|------|------|
 | Lv0 | 普通 QQ 用户 | 查询、绑定、帮助 |
 | Lv1 | QQ 群管理员/群主 | 群管理操作、Bot 状态 |
-| Lv2 | 超级用户 (SUPERUSERS) | 强制绑定、Bot 调试、热重载 |
+| Lv2 | 超级用户 (SUPERUSERS) | 强制绑定、Bot 调试、配置管理 |
+
+### 动态权限配置（v0.2.2+）
+
+超级管理员可以为每个群单独配置：
+- ✅/❌ **功能开关**：启用或禁用任意命令
+- 🔐 **权限调整**：修改执行命令所需的最低权限
+
+示例：
+```bash
+# 禁用封禁功能
+#bot disable gban
+
+# 允许所有人查询位置
+#bot permission whereis user
+
+# 提高踢人权限要求
+#bot permission gkick superuser
+```
+
+详见 [CONFIG_GUIDE.md](./CONFIG_GUIDE.md)
 
 ---
 
