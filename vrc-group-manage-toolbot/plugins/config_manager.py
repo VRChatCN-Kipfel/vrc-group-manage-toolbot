@@ -4,7 +4,7 @@
 """
 
 from nonebot import on_command, logger
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, Message
 from nonebot.params import CommandArg
 
 from services.permission import get_permission_level, PermissionLevel, check_command_permission, set_temp_permission, clear_temp_permission, get_all_temp_permissions
@@ -19,6 +19,8 @@ config_cmd = on_command("bot", priority=5, block=True)
 @config_cmd.handle()
 async def handle_config(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     """配置管理主命令"""
+    if isinstance(event, PrivateMessageEvent):
+        await config_cmd.finish(format_error("此命令仅群聊可用"))
     # 检查是否为超级管理员
     level = await get_permission_level(bot, event)
     if level < PermissionLevel.SUPERUSER:
@@ -108,7 +110,7 @@ async def handle_status(bot: Bot, event: GroupMessageEvent):
     for cmd_name, cmd_config in config.commands.items():
         defaults = COMMAND_DEFAULTS.get(cmd_name, {})
         if (cmd_config.enabled != defaults.get("enabled", True) or 
-            cmd_config.permission != defaults.get("permission", PermissionLevel.USER).value):
+            cmd_config.permission != defaults.get("permission", PermissionLevel.UNBOUND_USER).value):
             modified_cmds.append((cmd_name, cmd_config))
     
     if modified_cmds:
@@ -166,7 +168,7 @@ async def handle_list(bot: Bot, event: GroupMessageEvent):
                 defaults = COMMAND_DEFAULTS.get(cmd_name, {})
                 is_default = (
                     cmd_config.enabled == defaults.get("enabled", True) and
-                    cmd_config.permission == defaults.get("permission", PermissionLevel.USER).value
+                    cmd_config.permission == defaults.get("permission", PermissionLevel.UNBOUND_USER).value
                 )
                 marker = "" if is_default else " ⚙️"
                 
@@ -268,7 +270,7 @@ async def handle_reset(bot: Bot, event: GroupMessageEvent, cmd_name: str = None)
     else:
         # 重置所有命令配置
         config.commands.clear()
-        # 重新初始化会由 model_post_init 自动完成
+        config.model_post_init(None)
         group_config_store.set(config)
         
         await config_cmd.finish(format_success("已重置所有命令配置为默认值"))

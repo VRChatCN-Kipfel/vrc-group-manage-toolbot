@@ -1,6 +1,7 @@
 from enum import IntEnum
 from typing import TYPE_CHECKING, Optional, Dict
 
+from nonebot import logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 
 if TYPE_CHECKING:
@@ -108,7 +109,8 @@ async def check_vrc_group_role(
             if role and role.name.lower() in required_roles:
                 return True
         return False
-    except Exception:
+    except Exception as e:
+        logger.warning(f"check_vrc_group_role failed: {e}")
         return False
 
 

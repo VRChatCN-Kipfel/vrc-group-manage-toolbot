@@ -99,7 +99,7 @@ class VRCClient:
             # 构建请求参数：BasicAuth + twoFactorAuth cookie（按用户隔离）
             kwargs = {"json": {"code": tfa_code}}
             cookie_key = str(user_id) if user_id else "_default"
-            pending_cookie = self._pending_2fa_cookies.pop(cookie_key, None)
+            pending_cookie = self._pending_2fa_cookies.get(cookie_key)
             if pending_cookie:
                 kwargs["headers"] = {"Cookie": f"twoFactorAuth={pending_cookie}"}
             else:
@@ -120,6 +120,7 @@ class VRCClient:
             if tfa_response.status_code != 200:
                 logger.error(f"2FA verify non-200: {tfa_response.text[:200]}")
                 return False
+            self._pending_2fa_cookies.pop(cookie_key, None)
             twofa_cookie = tfa_response.cookies.get("twoFactorAuth")
             if not twofa_cookie:
                 logger.error(f"No twoFactorAuth, cookies: {dict(tfa_response.cookies)}")

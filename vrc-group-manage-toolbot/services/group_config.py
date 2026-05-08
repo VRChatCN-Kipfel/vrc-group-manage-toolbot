@@ -83,7 +83,7 @@ class GroupConfig(BaseModel):
             return self.commands[command_name].get_permission_level()
         # 如果命令不在配置中，使用默认值
         defaults = COMMAND_DEFAULTS.get(command_name, {})
-        return defaults.get("permission", PermissionLevel.USER)
+        return defaults.get("permission", PermissionLevel.UNBOUND_USER)
     
     def set_command_enabled(self, command_name: str, enabled: bool):
         """设置命令启用状态"""

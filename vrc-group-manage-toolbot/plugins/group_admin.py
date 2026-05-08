@@ -88,7 +88,7 @@ async def handle_gmembers(bot: Bot, event: GroupMessageEvent, state: T_State,
         msg += "\n"
 
     if len(members) == 20:
-        msg += f"📄 下一页: /gmembers {group_id} {page + 1}"
+        msg += f"📄 下一页: #gmembers {group_id} {page + 1}"
     else:
         msg += f"共 {len(members)} 人"
 
@@ -124,6 +124,8 @@ async def handle_ginvite(bot: Bot, event: GroupMessageEvent, args: Message = Com
         ))
 
     user_id = parts[0]
+
+    await require_auth(ginvite_cmd)
 
     await ginvite_cmd.send(f"正在邀请 {user_id} 加入群组...")
 
@@ -176,9 +178,11 @@ async def handle_gkick_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
 
 @gkick_cmd.got("confirm", prompt="⚠️ 确认将此用户踢出群组？回复 'yes' 确认，其他任意键取消")
 async def handle_gkick_confirm(bot: Bot, event: GroupMessageEvent, state: T_State,
-                               confirm: str = ArgPlainText()):
+                                confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gkick_cmd.finish("操作已取消")
+
+    await require_auth(gkick_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -229,9 +233,11 @@ async def handle_gban_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
 
 @gban_cmd.got("confirm", prompt="⚠️ 确认封禁此用户？回复 'yes' 确认，其他任意键取消")
 async def handle_gban_confirm(bot: Bot, event: GroupMessageEvent, state: T_State,
-                              confirm: str = ArgPlainText()):
+                               confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gban_cmd.finish("操作已取消")
+
+    await require_auth(gban_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -276,6 +282,8 @@ async def handle_gunban(bot: Bot, event: GroupMessageEvent, args: Message = Comm
         ))
 
     user_id = parts[0]
+
+    await require_auth(gunban_cmd)
 
     await gunban_cmd.send(f"正在解封 {user_id}...")
 
@@ -323,6 +331,8 @@ async def handle_grole(bot: Bot, event: GroupMessageEvent, args: Message = Comma
 
     user_id = parts[0]
     role_name = " ".join(parts[1:])
+
+    await require_auth(grole_cmd)
 
     client = get_vrc_client()
 
@@ -384,6 +394,8 @@ async def handle_grequests(bot: Bot, event: GroupMessageEvent, args: Message = C
 
     await grequests_cmd.send("正在查询入群申请...")
 
+    await require_auth(grequests_cmd)
+
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
         client.get_group_join_requests,
@@ -439,6 +451,8 @@ async def handle_gaccept(bot: Bot, event: GroupMessageEvent, args: Message = Com
 
     user_id = parts[0]
 
+    await require_auth(gaccept_cmd)
+
     await gaccept_cmd.send(f"正在批准 {user_id} 的入群申请...")
 
     client = get_vrc_client()
@@ -486,6 +500,8 @@ async def handle_greject(bot: Bot, event: GroupMessageEvent, args: Message = Com
 
     user_id = parts[0]
 
+    await require_auth(greject_cmd)
+
     await greject_cmd.send(f"正在拒绝 {user_id} 的入群申请...")
 
     client = get_vrc_client()
@@ -519,12 +535,6 @@ async def handle_gannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_Stat
     text = args.extract_plain_text().strip()
     lines = text.split("\n", 1)
 
-    if len(lines) < 2:
-        await gannounce_cmd.finish(format_error(
-            "参数不足",
-            "用法: #gannounce\n<标题>\n<内容>",
-        ))
-
     group_id = resolve_group_id(event)
     
     if not group_id:
@@ -534,13 +544,10 @@ async def handle_gannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_Stat
         ))
 
     title = lines[0].strip()
-    content = lines[1] if len(lines) > 1 else ""
+    content = lines[1].strip() if len(lines) > 1 else ""
 
     if not title:
         await gannounce_cmd.finish(format_error("请提供公告标题"))
-
-    if not content:
-        await gannounce_cmd.finish(format_error("请提供公告内容"))
 
     state["group_id"] = group_id
     state["title"] = title
@@ -553,6 +560,8 @@ async def handle_gannounce_confirm(bot: Bot, event: GroupMessageEvent, state: T_
                                    confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gannounce_cmd.finish("操作已取消")
+
+    await require_auth(gannounce_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -609,6 +618,8 @@ async def handle_gdelannounce_confirm(bot: Bot, event: GroupMessageEvent, state:
     if confirm.strip().lower() != "yes":
         await gdelannounce_cmd.finish("操作已取消")
 
+    await require_auth(gdelannounce_cmd)
+
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
         client.delete_group_announcement,
@@ -644,6 +655,8 @@ async def handle_gaudit(bot: Bot, event: GroupMessageEvent, args: Message = Comm
         ))
 
     await gaudit_cmd.send("正在查询审核日志...")
+
+    await require_auth(gaudit_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(

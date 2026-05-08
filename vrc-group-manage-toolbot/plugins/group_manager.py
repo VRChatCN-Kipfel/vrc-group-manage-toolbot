@@ -11,7 +11,7 @@ from nonebot.params import CommandArg
 
 from utils import get_vrc_client, check_vrc_auth
 from services.api_guard import api_guard
-from services.message_utils import format_error
+from services.message_utils import format_error, send_long_message
 from services.permission import check_command_permission, get_permission_level, PermissionLevel
 
 
@@ -99,7 +99,7 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
         logger.error(f"查询群组实例失败: {e}")
         msg = f"查询失败: {str(e)}"
 
-    await group_instances.finish(msg)
+    await send_long_message(group_instances, msg)
 
 
 @user_location.handle()
@@ -160,7 +160,7 @@ async def handle_user_location(bot: Bot, event: MessageEvent, args: Message = Co
         logger.error(f"查询用户位置失败: {e}")
         msg = f"查询失败: {str(e)}"
 
-    await user_location.finish(msg)
+    await send_long_message(user_location, msg)
 
 
 # 登录命令
@@ -200,8 +200,8 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
 
         await vrc_login.send("正在验证 Cookie...")
         user = None
+        client = get_vrc_client()
         try:
-            client = get_vrc_client()
             client.config.auth_cookie = cookie
             client.client = None
             client._authenticated = False
@@ -234,8 +234,12 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
         return
 
     if result == "need_2fa":
-        _pending_2fa_users.add(str(event.user_id))
-        _pending_2fa_tasks[str(event.user_id)] = asyncio.create_task(_clear_2fa_after(str(event.user_id), 30))
+        user_key = str(event.user_id)
+        existing = _pending_2fa_tasks.pop(user_key, None)
+        if existing:
+            existing.cancel()
+        _pending_2fa_users.add(user_key)
+        _pending_2fa_tasks[user_key] = asyncio.create_task(_clear_2fa_after(user_key, 30))
         await vrc_login.send("⚠️ 需要两步验证 (TOTP)，请在 30 秒内使用 #2fa <6位验证码>")
         await vrc_login.finish()
         return
