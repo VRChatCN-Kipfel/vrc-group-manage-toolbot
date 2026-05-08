@@ -1,1 +1,6 @@
 /utils/README.md
+.env
+data/
+__pycache__/
+*.pyc
+.env.prod

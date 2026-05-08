@@ -1,5 +1,200 @@
 # Changelog
 
+## v0.3.0 — 2026-05-08
+
+### 🚀 重大安全升级：群组绑定模型全面转换
+
+#### 核心变更
+
+**群聊中完全禁止携带 `grp_xxx` 参数** - 所有群组管理指令强制使用已绑定的 VRChat 群组，防止越权操作。
+
+这一变更解决了关键安全问题：
+- ❌ **修复前**：QQ 群管理员 A 可通过 `#gkick grp_乙群 usr_xxx` 管理乙群
+- ✅ **修复后**：所有指令自动使用当前 QQ 群绑定的 VRChat 群组，参数被忽略
+
+#### 新增功能
+
+- **新增 `plugins/group_bind.py`** — QQ 群与 VRChat 群组绑定管理系统
+  - `#bindgroup` 查询当前群绑定状态（任何人可用）
+  - `#bindgroup <grp_xxx>` 绑定当前群到指定 VRChat 群组（仅超管）
+  - `#bindgroup unbind` 解除当前群绑定（仅超管）
+  - `#bindgroup <grp_xxx> <QQ号>` 私聊中为指定群绑定（仅超管）
+  - 支持一个 VRChat 群组绑定到多个 QQ 群
+  - 一个 QQ 群只能绑定到一个 VRChat 群组（唯一性约束）
+
+- **新增 `services/group_config.get_by_vrc_group()`** — 反向查询方法
+  - 根据 VRChat 群组 ID 查找所有绑定的 QQ 群
+  - 用于 `#bindgroup` 查询时显示关联的 QQ 群列表
+
+#### 指令行为变更
+
+**群组管理指令（12个）** - 移除 `grp_xxx` 参数支持：
+
+| 指令 | 原用法 | 新用法（群聊） |
+|------|--------|--------------|
+| `#gmembers` | `#gmembers grp_xxx [页]` | `#gmembers [页]` |
+| `#ginvite` | `#ginvite grp_xxx usr_xxx` | `#ginvite usr_xxx` |
+| `#gkick` | `#gkick grp_xxx usr_xxx` | `#gkick usr_xxx` |
+| `#gban` | `#gban grp_xxx usr_xxx` | `#gban usr_xxx` |
+| `#gunban` | `#gunban grp_xxx usr_xxx` | `#gunban usr_xxx` |
+| `#grole` | `#grole grp_xxx usr_xxx 角色` | `#grole usr_xxx 角色` |
+| `#grequests` | `#grequests grp_xxx` | `#grequests` |
+| `#gaccept` | `#gaccept grp_xxx usr_xxx` | `#gaccept usr_xxx` |
+| `#greject` | `#greject grp_xxx usr_xxx` | `#greject usr_xxx` |
+| `#gannounce` | `#gannounce grp_xxx\n标题\n内容` | `#gannounce\n标题\n内容` |
+| `#gdelannounce` | `#gdelannounce grp_xxx ann_xxx` | `#gdelannounce ann_xxx` |
+| `#gaudit` | `#gaudit grp_xxx` | `#gaudit` |
+
+**查询指令**：
+- `#instances` - 群聊中自动显示当前群绑定的 VRChat 群组实例，私聊中超管可指定 `grp_xxx`
+
+#### 技术实现
+
+- **重构 `resolve_group_id()` 函数**
+  - 群聊中：强制返回已绑定的 `default_vrc_group`，忽略任何传入参数
+  - 私聊中：理论上不应到达（所有指令限制为 `GroupMessageEvent`）
+
+- **简化参数解析逻辑**
+  - 移除复杂的 `user_arg_idx` 索引计算
+  - 所有指令统一从 `parts[0]` 开始读取用户参数
+  - 代码量减少约 30%，可读性提升
+
+- **增强错误提示**
+  - 未绑定群组时：明确提示联系超管使用 `#bindgroup` 绑定
+  - 所有指令用法提示已更新，移除 `grp_xxx` 参数说明
+
+#### 私聊权限控制
+
+- **所有指令添加私聊超管检查**
+  - `#instances`, `#whereis` - 私聊中仅超管可用
+  - `#vrclLogin`, `#2fa`, `#vrcCheck` - 私聊中仅超管可用
+  - 普通用户私聊会被拒绝，防止滥用 API
+
+#### 迁移指南
+
+**超级管理员首次使用前必须执行**：
+```bash
+# 在目标 QQ 群中
+#bindgroup grp_xxxxxxxx
+```
+
+**之后所有管理操作都基于绑定的群组**：
+```bash
+#gmembers              # 查看绑定的群组成员
+#gkick usr_xyz         # 从绑定的群组踢人
+#gannounce             # 在绑定的群组发布公告
+标题
+内容
+```
+
+---
+
+## v0.2.3 — 2026-05-08
+
+### 🚀 新增功能
+
+#### 临时权限管理系统
+- **新增内存级权限覆盖功能** (`services/permission.py`)
+  - `set_temp_permission(qq_id, level)`：为指定用户设置临时权限等级
+  - `clear_temp_permission(qq_id)`：清除指定用户的临时权限
+  - `get_all_temp_permissions()`：获取当前所有临时权限设置
+  - **优先级最高**：临时权限在身份识别时优先于 QQ 身份和绑定状态生效
+
+- **新增配置管理子命令** (`plugins/config_manager.py`)
+  - `#bot settemppermission @QQ <权限>`：临时设定某人权限（重启失效）
+    - 安全限制：禁止通过此命令赋予 Lv5 (SUPERUSER) 权限
+  - `#bot cleartemppermission @QQ`：清除某人临时权限
+  - `#bot temppermissions`：查看当前所有临时权限设置列表
+
+### 💡 使用场景
+1. **紧急降级**：管理员账号异常时，立即运行 `#bot settemppermission @捣乱的管理 0` 剥夺其权限
+2. **临时授权**：给热心成员临时开放管理权限 `#bot settemppermission @热心成员 3`
+3. **权限审计**：通过 `#bot temppermissions` 随时检查当前的特权名单
+
+---
+
+## v0.2.2 — 2026-05-08
+
+### 🚀 新增功能
+
+#### 动态配置系统
+- **新增 `plugins/config_manager.py`** — 配置管理插件（仅超级管理员）
+  - `#bot` 显示帮助信息
+  - `#bot status` 查看当前群配置状态
+  - `#bot list` 列出所有可配置命令
+  - `#bot enable/disable <命令>` 启用/禁用命令
+  - `#bot permission <命令> <权限>` 设置权限等级
+  - `#bot reset [命令]` 重置配置
+
+#### 六级细粒度权限体系
+- **重构 `services/permission.py`**
+  - 权限等级从 3 级扩展为 6 级：
+    - Lv0: 未绑定普通成员 (UNBOUND_USER)
+    - Lv1: 已绑定普通成员 (BOUND_USER)
+    - Lv2: 未绑定管理员 (UNBOUND_ADMIN)
+    - Lv3: 已绑定管理员 (BOUND_ADMIN)
+    - Lv4: 群主 (OWNER)
+    - Lv5: 机器人超级管理员 (SUPERUSER)
+  - `get_permission_level()` 逻辑升级：同时识别 QQ 身份与 VRChat 绑定状态
+  - 临时权限支持：提供内存级权限覆盖接口（`set_temp_permission`）
+
+- **优化默认配置 (`COMMAND_DEFAULTS`)**
+  - 查询类命令默认要求 **Lv1 (已绑定成员)**，鼓励用户完成绑定
+  - 敏感管理类命令（如封禁、踢人）默认提升至 **Lv4 (群主)**
+  - 常规管理类命令默认要求 **Lv3 (已绑定管理员)**
+
+#### 细粒度权限控制
+- **扩展 `services/group_config.py`**
+  - 新增 `CommandConfig` 模型：单个命令的配置（enabled + permission）
+  - 新增 `COMMAND_DEFAULTS`：24个命令的默认配置
+  - `GroupConfig` 新增 `commands` 字段：存储每个命令的独立配置
+  - 新增方法：`is_command_enabled()`, `get_command_permission()`, `set_command_enabled()`, `set_command_permission()`
+
+- **扩展 `services/permission.py`**
+  - 新增 `check_command_permission()`：统一的权限检查函数
+    - 检查功能是否启用
+    - 检查用户权限等级
+    - 返回 (是否允许, 错误消息)
+
+#### 全插件权限集成
+- **更新所有插件**：添加统一的权限检查
+  - `plugins/group_admin.py`：12个管理命令全部接入权限系统
+  - `plugins/user_bind.py`：5个绑定命令接入权限系统
+  - `plugins/group_manager.py`：查询命令接入权限系统
+  - 替换原有的硬编码权限检查为 `check_command_permission()`
+
+### 🔧 改进
+
+- **按群独立配置**：每个QQ群有独立的命令开关和权限设置
+- **默认配置自动填充**：新群或新命令自动获得合理的默认值
+- **配置持久化**：所有修改立即保存到 `data/vrc_toolbot/group_configs.json`
+- **友好的错误提示**：权限不足时明确告知需要的权限等级
+- **文档完善**：新增 `CONFIG_GUIDE.md` 详细使用说明
+
+### 📁 文件变更
+
+```
++(新增) plugins/config_manager.py       # 配置管理插件
++(新增) CONFIG_GUIDE.md                 # 配置系统使用指南
+M services/group_config.py              # 扩展命令配置功能
+M services/permission.py                # 新增权限检查函数
+M services/__init__.py                  # 导出新组件
+M plugins/group_admin.py                # 集成权限检查
+M plugins/user_bind.py                  # 集成权限检查
+M plugins/group_manager.py              # 集成权限检查
+M README.md                             # 更新文档
+```
+
+### 💡 使用场景
+
+1. **临时禁用功能**：`#bot disable instances`（API故障时）
+2. **提高敏感操作权限**：`#bot permission gban superuser`
+3. **开放查询功能**：`#bot permission whereis user`
+4. **批量关闭管理**：逐个 `#bot disable gxxx` 命令
+5. **快速恢复默认**：`#bot reset`
+
+---
+
 ## v0.2.1 — 2026-05-08
 
 ### 🐛 修复
