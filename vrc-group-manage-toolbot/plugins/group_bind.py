@@ -22,6 +22,7 @@ bindgroup_cmd = on_command("bindgroup", priority=5, block=True)
 async def handle_bindgroup(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent, 
                            args: Message = CommandArg()):
     text = args.extract_plain_text().strip()
+    logger.debug(f"bindgroup handler: event={type(event).__name__}, text={text!r}")
     
     # 情况1：无参数 - 查询当前绑定状态（任何人可用）
     if not text:
