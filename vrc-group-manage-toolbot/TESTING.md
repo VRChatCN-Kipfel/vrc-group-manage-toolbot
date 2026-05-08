@@ -15,12 +15,12 @@
 | 功能 | 命令 | 结果 |
 |------|------|------|
 | 帮助信息 | `#bot` | ✅ 正常（分隔线渲染问题已修） |
-| 群配置状态 | `#bot status` | ❌ 未测 |
-| 命令列表 | `#bot list` | ❌ 未测 |
-| 启用命令 | `#bot enable <命令>` | ❌ 未测 |
-| 禁用命令 | `#bot disable <命令>` | ❌ 未测 |
+| 群配置状态 | `#bot status` | ✅ 正常 |
+| 命令列表 | `#bot list` | ✅ 正常，按模块分组 |
+| 启用命令 | `#bot enable <命令>` | ✅ 正常 |
+| 禁用命令 | `#bot disable <命令>` | ✅ 正常 |
 | 设置权限 | `#bot permission <命令> <等级>` | ❌ 未测 |
-| 重置配置 | `#bot reset [命令]` | ❌ 未测 |
+| 重置配置 | `#bot reset [命令]` | ✅ 正常，model_post_init 已修复 |
 | 非超管拒绝 | 普通用户发 `#bot` | ❌ 未测 |
 | 私聊拒绝 | 私聊发 `#bot` | ❌ 未测 |
 
@@ -28,7 +28,7 @@
 | 功能 | 命令 | 结果 |
 |------|------|------|
 | 设置临时权限 | `#bot settemppermission @QQ 4` | ✅ @机器人设为群主，正常 |
-| 清除临时权限 | `#bot cleartemppermission @QQ` | ❌ 未通过（@解析失败，正在修） |
+| 清除临时权限 | `#bot cleartemppermission @QQ` | ✅ @解析问题已修（改用 event.raw_message） |
 | 查看临时权限 | `#bot temppermissions` | ❌ 未测 |
 | 禁止赋 Lv5 | `#bot settemppermission @QQ 5` | ❌ 未测 |
 | 临权优先级 | 临权覆盖真实身份 | ❌ 未测 |
@@ -41,7 +41,7 @@
 | 群聊绑定 | `#bindgroup grp_xxx` | ✅ 正常 |
 | 群聊解绑 | `#bindgroup unbind` | ✅ 正常 |
 | 私聊查询 | `#bindgroup 1065673490` | ✅ 正常（条件反转bug已修） |
-| 私聊绑定 | `#bindgroup grp_xxx 1065673490` | ❌ 未测 |
+| 私聊绑定 | `#bindgroup grp_xxx 1065673490` | ✅ 正常 |
 | 私聊解绑 | `#bindgroup unbind 750834329` | ✅ 正常（残留查询代码已清） |
 | 非超管绑/解 | 普通用户 `#bindgroup grp_xxx` | ❌ 未测 |
 | 已有绑定再绑 | 已绑定的群再 `#bindgroup grp_其他` | ❌ 未测 |
@@ -90,22 +90,17 @@
 
 ## 未测试（完整清单）
 
-### `#bot` 子命令 (10 项)
+### `#bot` 子命令 (12 项 → 6 项待测)
 
 | # | 命令 | 验证点 |
 |---|------|--------|
-| 1.1 | `#bot status` | 显示群配置状态，含默认群组、启用/禁用状态、权限统计 |
-| 1.2 | `#bot list` | 列出 24 个命令，按模块分组，显示状态和权限 |
-| 1.3 | `#bot enable gmembers` | 启用群成员查询 |
-| 1.4 | `#bot disable gmembers` | 禁用群成员查询 |
-| 1.5 | `#bot enable bot` | 应拒绝：不能禁用配置管理命令 |
-| 1.6 | `#bot permission whereis 0` | 修改 whereis 为 Lv0 |
-| 1.7 | `#bot permission whereis bound_user` | 用名称修改权限 |
-| 1.8 | `#bot permission bot 0` | 应拒绝：配置管理必须超管 |
-| 1.9 | `#bot permission whereis invalid` | 应报错：无效权限等级 |
-| 1.10 | `#bot reset [命令]` / `#bot reset` | 重置单个或全部命令到默认值 |
-| 1.11 | 普通用户 `#bot` | 应拒绝：仅超管可用 |
-| 1.12 | 私聊 `#bot` | 应拒绝：仅群聊可用 |
+| 1.1 | `#bot enable bot` | 应拒绝：不能禁用配置管理命令 |
+| 1.2 | `#bot permission whereis 0` | 修改 whereis 为 Lv0 |
+| 1.3 | `#bot permission whereis bound_user` | 用名称修改权限 |
+| 1.4 | `#bot permission bot 0` | 应拒绝：配置管理必须超管 |
+| 1.5 | `#bot permission whereis invalid` | 应报错：无效权限等级 |
+| 1.6 | 普通用户 `#bot` | 应拒绝：仅超管可用 |
+| 1.7 | 私聊 `#bot` | 应拒绝：仅群聊可用 |
 
 ### 临时权限 (8 项)
 
@@ -120,16 +115,15 @@
 | 2.7 | 清除后身份恢复 | clear 后恢复到真实身份 |
 | 2.8 | Bot 重启后临权自动清除 | temppermissions 为空 |
 
-### 群组绑定 (6 项)
+### 群组绑定 (6 项 → 5 项待测)
 
 | # | 命令 | 验证点 |
 |---|------|--------|
-| 3.1 | 私聊 `#bindgroup grp_xxx 1065673490` | 为该群绑定 |
-| 3.2 | 非超管 `#bindgroup grp_xxx` | 应拒绝 |
-| 3.3 | 非超管 `#bindgroup unbind` | 应拒绝 |
-| 3.4 | 已绑定群再绑其他 | 应提示先解绑 |
-| 3.5 | 未绑定群 `#bindgroup unbind` | 应提示无需解绑 |
-| 3.6 | 私聊查询不同群 | `#bindgroup 750834329` vs `#bindgroup 1065673490` |
+| 3.1 | 非超管 `#bindgroup grp_xxx` | 应拒绝 |
+| 3.2 | 非超管 `#bindgroup unbind` | 应拒绝 |
+| 3.3 | 已绑定群再绑其他 | 应提示先解绑 |
+| 3.4 | 未绑定群 `#bindgroup unbind` | 应提示无需解绑 |
+| 3.5 | 私聊查询不同群 | `#bindgroup 750834329` vs `#bindgroup 1065673490` |
 
 ### 私聊权限限制 (5 项)
 
@@ -193,17 +187,17 @@
 
 | 状态 | 数量 |
 |------|------|
-| ✅ 已测通过 | 18 |
-| ❌ 未测试 | **51** |
+| ✅ 已测通过 | 25 |
+| ❌ 未测试 | **44** |
 | ⚠️ 已知问题 | 1 (Cookie 直登跨域) |
 
 ### 未测试按模块分布
 
 | 模块 | 未测数 |
 |------|--------|
-| `#bot` 配置管理 | 12 |
-| 临时权限 | 8 |
-| 群组绑定边界 | 6 |
+| `#bot` 配置管理 | 7 |
+| 临时权限 | 7 |
+| 群组绑定边界 | 5 |
 | 私聊限制 | 5 |
 | 群管理命令 | 14 |
 | 查询命令 | 3 |
