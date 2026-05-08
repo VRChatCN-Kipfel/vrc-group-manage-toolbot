@@ -3,12 +3,14 @@
 用于动态调整功能开关和权限设置
 """
 
+import re
 from nonebot import on_command, logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, Message
 from nonebot.params import CommandArg
 
 from services.permission import get_permission_level, PermissionLevel, check_command_permission, set_temp_permission, clear_temp_permission, get_all_temp_permissions
-from services.message_utils import format_success, format_error, send_long_message
+import re
+from .services.message_utils import format_success, format_error, send_long_message
 from services.group_config import group_config_store, COMMAND_DEFAULTS
 
 
@@ -276,16 +278,24 @@ async def handle_reset(bot: Bot, event: GroupMessageEvent, cmd_name: str = None)
         await config_cmd.finish(format_success("已重置所有命令配置为默认值"))
 
 
-async def handle_set_temp_permission(bot: Bot, event: GroupMessageEvent, raw_msg: Message, perm_str: str):
-    """设置临时权限"""
-    # 提取 @QQ
-    at_qq = None
+def _extract_at_qq(raw_msg: Message) -> str | None:
+    """从消息中提取第一个 @QQ 号"""
     for seg in raw_msg:
         if seg.type == "at":
             qq = seg.data.get("qq", "")
             if qq and qq != "all":
-                at_qq = str(qq)
-                break
+                return str(qq)
+    # 段遍历失败时尝试从 CQ 码字符串解析
+    text = str(raw_msg)
+    m = re.search(r'\[CQ:at,qq=(\d+)\]', text)
+    if m:
+        return m.group(1)
+    return None
+
+
+async def handle_set_temp_permission(bot: Bot, event: GroupMessageEvent, raw_msg: Message, perm_str: str):
+    """设置临时权限"""
+    at_qq = _extract_at_qq(raw_msg)
     
     if not at_qq:
         await config_cmd.finish(format_error("请 @ 要设置权限的用户"))
@@ -317,14 +327,7 @@ async def handle_set_temp_permission(bot: Bot, event: GroupMessageEvent, raw_msg
 
 async def handle_clear_temp_permission(bot: Bot, event: GroupMessageEvent, raw_msg: Message):
     """清除临时权限"""
-    at_qq = None
-    for seg in raw_msg:
-        logger.debug(f"cleartemppermission seg: type={seg.type!r}, data={seg.data}")
-        if seg.type == "at":
-            qq = seg.data.get("qq", "")
-            if qq and qq != "all":
-                at_qq = str(qq)
-                break
+    at_qq = _extract_at_qq(raw_msg)
     
     if not at_qq:
         await config_cmd.finish(format_error("请 @ 要清除临时权限的用户"))
