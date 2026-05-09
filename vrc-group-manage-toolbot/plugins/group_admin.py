@@ -2,10 +2,11 @@ from nonebot import on_command, logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message
 from nonebot.params import CommandArg, ArgPlainText
 from nonebot.typing import T_State
+from typing import Optional
 
 from utils import get_vrc_client, ensure_vrc_auth
 from services.api_guard import api_guard
-from services.permission import get_permission_level, PermissionLevel
+from services.permission import get_permission_level, PermissionLevel, check_command_permission
 from services.message_utils import format_success, format_error, send_long_message
 from services.group_config import group_config_store
 
@@ -16,10 +17,14 @@ async def require_auth(matcher, client=None):
         await matcher.finish("⚠️ 尚未登录 VRChat API\n请先使用 #vrclLogin 或 #vrclLogin cookie=xxx")
 
 
-def resolve_group_id(text_parts: list, qq_group_id: str) -> str:
-    if text_parts and text_parts[0].startswith("grp_"):
-        return text_parts[0]
-    config = group_config_store.get(qq_group_id)
+def resolve_group_id(event: GroupMessageEvent) -> Optional[str]:
+    """
+    解析群组 ID
+    - 群聊中：强制使用已绑定的默认群组，忽略任何传入的 grp_xxx 参数
+    """
+    config = group_config_store.get(str(event.group_id))
+    if not config.default_vrc_group:
+        return None
     return config.default_vrc_group
 
 
@@ -31,17 +36,23 @@ gmembers_cmd = on_command("gmembers", priority=5, block=True)
 @gmembers_cmd.handle()
 async def handle_gmembers(bot: Bot, event: GroupMessageEvent, state: T_State,
                           args: Message = CommandArg()):
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gmembers")
+    if not allowed:
+        await gmembers_cmd.finish(error_msg)
+    
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
+    group_id = resolve_group_id(event)
+    
     if not group_id:
         await gmembers_cmd.finish(format_error(
-            "请提供群组ID",
-            "/gmembers grp_xxx 或使用 /bot config 设置默认群组",
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
         ))
 
     await require_auth(gmembers_cmd)
 
-    page = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
+    page = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 1
 
     await gmembers_cmd.send("正在查询群成员...")
 
@@ -62,7 +73,7 @@ async def handle_gmembers(bot: Bot, event: GroupMessageEvent, state: T_State,
         await gmembers_cmd.finish(f"群组 {group_id} 没有成员")
 
     msg = f"📋 群组成员 (第{page}页)\n"
-    msg += "─" * 24 + "\n"
+    msg += "=" * 24 + "\n"
     for m in members[:20]:
         msg += f"• {m.userId}\n"
         if m.roleIds:
@@ -70,7 +81,7 @@ async def handle_gmembers(bot: Bot, event: GroupMessageEvent, state: T_State,
         msg += "\n"
 
     if len(members) == 20:
-        msg += f"📄 下一页: /gmembers {group_id} {page + 1}"
+        msg += f"📄 下一页: #gmembers {group_id} {page + 1}"
     else:
         msg += f"共 {len(members)} 人"
 
@@ -84,21 +95,29 @@ ginvite_cmd = on_command("ginvite", priority=5, block=True)
 
 @ginvite_cmd.handle()
 async def handle_ginvite(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await ginvite_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "ginvite")
+    if not allowed:
+        await ginvite_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    user_arg_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= user_arg_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await ginvite_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await ginvite_cmd.finish(format_error(
             "参数不足",
-            "用法: /ginvite <群组ID> <用户ID>",
+            "用法: #ginvite <用户ID>",
         ))
 
-    user_id = parts[user_arg_idx]
+    user_id = parts[0]
+
+    await require_auth(ginvite_cmd)
 
     await ginvite_cmd.send(f"正在邀请 {user_id} 加入群组...")
 
@@ -124,29 +143,37 @@ gkick_cmd = on_command("gkick", priority=5, block=True)
 @gkick_cmd.handle()
 async def handle_gkick_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                            args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gkick_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gkick")
+    if not allowed:
+        await gkick_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    user_arg_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= user_arg_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await gkick_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await gkick_cmd.finish(format_error(
             "参数不足",
-            "用法: /gkick <群组ID> <用户ID>",
+            "用法: #gkick <用户ID>",
         ))
 
     state["group_id"] = group_id
-    state["user_id"] = parts[user_arg_idx]
+    state["user_id"] = parts[0]
 
 
 @gkick_cmd.got("confirm", prompt="⚠️ 确认将此用户踢出群组？回复 'yes' 确认，其他任意键取消")
 async def handle_gkick_confirm(bot: Bot, event: GroupMessageEvent, state: T_State,
-                               confirm: str = ArgPlainText()):
+                                confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gkick_cmd.finish("操作已取消")
+
+    await require_auth(gkick_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -170,29 +197,37 @@ gban_cmd = on_command("gban", priority=5, block=True)
 @gban_cmd.handle()
 async def handle_gban_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                           args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gban_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gban")
+    if not allowed:
+        await gban_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    user_arg_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= user_arg_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await gban_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await gban_cmd.finish(format_error(
             "参数不足",
-            "用法: /gban <群组ID> <用户ID>",
+            "用法: #gban <用户ID>",
         ))
 
     state["group_id"] = group_id
-    state["user_id"] = parts[user_arg_idx]
+    state["user_id"] = parts[0]
 
 
 @gban_cmd.got("confirm", prompt="⚠️ 确认封禁此用户？回复 'yes' 确认，其他任意键取消")
 async def handle_gban_confirm(bot: Bot, event: GroupMessageEvent, state: T_State,
-                              confirm: str = ArgPlainText()):
+                               confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gban_cmd.finish("操作已取消")
+
+    await require_auth(gban_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -215,21 +250,29 @@ gunban_cmd = on_command("gunban", priority=5, block=True)
 
 @gunban_cmd.handle()
 async def handle_gunban(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gunban_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gunban")
+    if not allowed:
+        await gunban_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    user_arg_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= user_arg_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await gunban_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await gunban_cmd.finish(format_error(
             "参数不足",
-            "用法: /gunban <群组ID> <用户ID>",
+            "用法: #gunban <用户ID>",
         ))
 
-    user_id = parts[user_arg_idx]
+    user_id = parts[0]
+
+    await require_auth(gunban_cmd)
 
     await gunban_cmd.send(f"正在解封 {user_id}...")
 
@@ -254,33 +297,30 @@ grole_cmd = on_command("grole", priority=5, block=True)
 
 @grole_cmd.handle()
 async def handle_grole(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await grole_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "grole")
+    if not allowed:
+        await grole_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await grole_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
     if len(parts) < 2:
         await grole_cmd.finish(format_error(
             "参数不足",
-            "用法: /grole <群组ID> <用户ID> <角色名>",
+            "用法: #grole <用户ID> <角色名>",
         ))
 
-    group_id = parts[0] if parts[0].startswith("grp_") else None
-    if not group_id:
-        config = group_config_store.get(str(event.group_id))
-        group_id = config.default_vrc_group
-        user_idx = 0
-    else:
-        user_idx = 1
+    user_id = parts[0]
+    role_name = " ".join(parts[1:])
 
-    if not group_id or len(parts) <= user_idx + 1:
-        await grole_cmd.finish(format_error(
-            "参数不足",
-            "用法: /grole <群组ID> <用户ID> <角色名>",
-        ))
-
-    user_id = parts[user_idx]
-    role_name = " ".join(parts[user_idx + 1:])
+    await require_auth(grole_cmd)
 
     client = get_vrc_client()
 
@@ -327,20 +367,22 @@ grequests_cmd = on_command("grequests", priority=5, block=True)
 
 @grequests_cmd.handle()
 async def handle_grequests(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await grequests_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "grequests")
+    if not allowed:
+        await grequests_cmd.finish(error_msg)
 
-    parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-
+    group_id = resolve_group_id(event)
+    
     if not group_id:
         await grequests_cmd.finish(format_error(
-            "请提供群组ID",
-            "/grequests grp_xxx",
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
         ))
 
     await grequests_cmd.send("正在查询入群申请...")
+
+    await require_auth(grequests_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -357,7 +399,7 @@ async def handle_grequests(bot: Bot, event: GroupMessageEvent, args: Message = C
         await grequests_cmd.finish("当前没有待处理的入群申请")
 
     msg = f"📋 入群申请 ({len(requests_list)}人)\n"
-    msg += "─" * 24 + "\n"
+    msg += "=" * 24 + "\n"
     for i, req in enumerate(requests_list[:20], 1):
         msg += f"{i}. {req.userId}\n"
 
@@ -374,21 +416,29 @@ gaccept_cmd = on_command("gaccept", priority=5, block=True)
 
 @gaccept_cmd.handle()
 async def handle_gaccept(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gaccept_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gaccept")
+    if not allowed:
+        await gaccept_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    user_arg_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= user_arg_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await gaccept_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await gaccept_cmd.finish(format_error(
             "参数不足",
-            "用法: /gaccept <群组ID> <用户ID>",
+            "用法: #gaccept <用户ID>",
         ))
 
-    user_id = parts[user_arg_idx]
+    user_id = parts[0]
+
+    await require_auth(gaccept_cmd)
 
     await gaccept_cmd.send(f"正在批准 {user_id} 的入群申请...")
 
@@ -414,21 +464,29 @@ greject_cmd = on_command("greject", priority=5, block=True)
 
 @greject_cmd.handle()
 async def handle_greject(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await greject_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "greject")
+    if not allowed:
+        await greject_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    user_arg_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= user_arg_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await greject_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await greject_cmd.finish(format_error(
             "参数不足",
-            "用法: /greject <群组ID> <用户ID>",
+            "用法: #greject <用户ID>",
         ))
 
-    user_id = parts[user_arg_idx]
+    user_id = parts[0]
+
+    await require_auth(greject_cmd)
 
     await greject_cmd.send(f"正在拒绝 {user_id} 的入群申请...")
 
@@ -455,43 +513,27 @@ gannounce_cmd = on_command("gannounce", priority=5, block=True)
 @gannounce_cmd.handle()
 async def handle_gannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                                args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gannounce_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gannounce")
+    if not allowed:
+        await gannounce_cmd.finish(error_msg)
 
     text = args.extract_plain_text().strip()
     lines = text.split("\n", 1)
 
-    if len(lines) < 2:
-        await gannounce_cmd.finish(format_error(
-            "参数不足",
-            "用法: /gannounce <群组ID>\n<标题>\n<内容>",
-        ))
-
-    group_id = lines[0].strip().split()[0] if lines[0].strip() else ""
-    title_line = lines[0].strip()
-    remaining = lines[1] if len(lines) > 1 else ""
-
-    if group_id.startswith("grp_"):
-        title = title_line[len(group_id):].strip() if title_line.startswith(group_id) else title_line
-        content = remaining
-    else:
-        config = group_config_store.get(str(event.group_id))
-        group_id = config.default_vrc_group
-        title = title_line
-        content = remaining
-
+    group_id = resolve_group_id(event)
+    
     if not group_id:
         await gannounce_cmd.finish(format_error(
-            "请提供群组ID",
-            "/gannounce grp_xxx\n标题\n内容",
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
         ))
+
+    title = lines[0].strip()
+    content = lines[1].strip() if len(lines) > 1 else ""
 
     if not title:
         await gannounce_cmd.finish(format_error("请提供公告标题"))
-
-    if not content:
-        await gannounce_cmd.finish(format_error("请提供公告内容"))
 
     state["group_id"] = group_id
     state["title"] = title
@@ -504,6 +546,8 @@ async def handle_gannounce_confirm(bot: Bot, event: GroupMessageEvent, state: T_
                                    confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gannounce_cmd.finish("操作已取消")
+
+    await require_auth(gannounce_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -528,22 +572,28 @@ gdelannounce_cmd = on_command("gdelannounce", priority=5, block=True)
 @gdelannounce_cmd.handle()
 async def handle_gdelannounce_pre(bot: Bot, event: GroupMessageEvent, state: T_State,
                                   args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gdelannounce_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gdelannounce")
+    if not allowed:
+        await gdelannounce_cmd.finish(error_msg)
 
     parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-    ann_id_idx = 1 if (parts and parts[0].startswith("grp_")) else 0
-
-    if not group_id or len(parts) <= ann_id_idx:
+    group_id = resolve_group_id(event)
+    
+    if not group_id:
+        await gdelannounce_cmd.finish(format_error(
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+        ))
+    
+    if len(parts) < 1:
         await gdelannounce_cmd.finish(format_error(
             "参数不足",
-            "用法: /gdelannounce <群组ID> <公告ID>",
+            "用法: #gdelannounce <公告ID>",
         ))
 
     state["group_id"] = group_id
-    state["announcement_id"] = parts[ann_id_idx]
+    state["announcement_id"] = parts[0]
 
 
 @gdelannounce_cmd.got("confirm",
@@ -552,6 +602,8 @@ async def handle_gdelannounce_confirm(bot: Bot, event: GroupMessageEvent, state:
                                       confirm: str = ArgPlainText()):
     if confirm.strip().lower() != "yes":
         await gdelannounce_cmd.finish("操作已取消")
+
+    await require_auth(gdelannounce_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -574,20 +626,22 @@ gaudit_cmd = on_command("gaudit", priority=5, block=True)
 
 @gaudit_cmd.handle()
 async def handle_gaudit(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    level = await get_permission_level(bot, event)
-    if level < PermissionLevel.GROUP_ADMIN:
-        await gaudit_cmd.finish(format_error("需要QQ群管理员权限"))
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "gaudit")
+    if not allowed:
+        await gaudit_cmd.finish(error_msg)
 
-    parts = args.extract_plain_text().strip().split()
-    group_id = resolve_group_id(parts, str(event.group_id))
-
+    group_id = resolve_group_id(event)
+    
     if not group_id:
         await gaudit_cmd.finish(format_error(
-            "请提供群组ID",
-            "/gaudit grp_xxx",
+            "当前群聊尚未绑定 VRChat 群组",
+            "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
         ))
 
     await gaudit_cmd.send("正在查询审核日志...")
+
+    await require_auth(gaudit_cmd)
 
     client = get_vrc_client()
     success, data, error = await api_guard.call_with_retry(
@@ -605,7 +659,7 @@ async def handle_gaudit(bot: Bot, event: GroupMessageEvent, args: Message = Comm
         await gaudit_cmd.finish("暂无审核日志")
 
     msg = "📋 审核日志 (最近50条)\n"
-    msg += "─" * 24 + "\n"
+    msg += "=" * 24 + "\n"
     for log_entry in logs[:20]:
         desc = log_entry.description or "无描述"
         created = log_entry.created_at or ""
