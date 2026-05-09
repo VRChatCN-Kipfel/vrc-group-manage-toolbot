@@ -10,7 +10,7 @@ from nonebot.typing import T_State
 
 from utils import get_vrc_client, check_vrc_auth
 from services.api_guard import api_guard
-from services.permission import get_permission_level, PermissionLevel
+from services.permission import PermissionLevel, check_command_permission
 from services.user_binding import user_binding_store, BindingRecord
 from services.message_utils import format_success, format_error, send_long_message
 
@@ -42,9 +42,10 @@ async def handle_bind(bot: Bot, event: GroupMessageEvent, args: Message = Comman
     raw_msg = event.get_message()
 
     if text.startswith("force"):
-        level = await get_permission_level(bot, event)
-        if level < PermissionLevel.SUPERUSER:
-            await bind_cmd.finish(format_error("强制绑定需要机器人超级管理员权限"))
+        # 检查权限 - force绑定需要超级管理员
+        allowed, error_msg = await check_command_permission(bot, event, "bind", PermissionLevel.SUPERUSER)
+        if not allowed:
+            await bind_cmd.finish(error_msg)
 
         at_qq = extract_at_qq(raw_msg)
         rest = text[5:].strip()
@@ -83,6 +84,11 @@ async def handle_bind(bot: Bot, event: GroupMessageEvent, args: Message = Comman
         ))
         return
 
+    # 检查普通bind命令权限
+    allowed, error_msg = await check_command_permission(bot, event, "bind")
+    if not allowed:
+        await bind_cmd.finish(error_msg)
+    
     vrc_id = text.split()[0] if text else ""
 
     if not vrc_id or not vrc_id.startswith("usr_"):
@@ -144,6 +150,11 @@ confirm_cmd = on_command("confirm", priority=5, block=True)
 
 @confirm_cmd.handle()
 async def handle_confirm(bot: Bot, event: GroupMessageEvent):
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "confirm")
+    if not allowed:
+        await confirm_cmd.finish(error_msg)
+    
     qq_id = str(event.user_id)
 
     pending = user_binding_store.get_by_qq(qq_id)
@@ -206,6 +217,11 @@ unbind_cmd = on_command("unbind", priority=5, block=True)
 
 @unbind_cmd.handle()
 async def handle_unbind_pre(bot: Bot, event: GroupMessageEvent, state: T_State):
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "unbind")
+    if not allowed:
+        await unbind_cmd.finish(error_msg)
+    
     binding = user_binding_store.get_by_qq(str(event.user_id))
     if not binding:
         await unbind_cmd.finish(format_error(
@@ -235,6 +251,11 @@ bindinfo_cmd = on_command("bindinfo", priority=5, block=True)
 
 @bindinfo_cmd.handle()
 async def handle_bindinfo(bot: Bot, event: GroupMessageEvent):
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "bindinfo")
+    if not allowed:
+        await bindinfo_cmd.finish(error_msg)
+    
     raw_msg = event.get_message()
     at_qq = extract_at_qq(raw_msg)
 
@@ -254,7 +275,7 @@ async def handle_bindinfo(bot: Bot, event: GroupMessageEvent):
     status = "✅ 已确认" if binding.confirmed else "⏳ 待验证"
 
     msg = f"🔗 绑定信息\n"
-    msg += "─" * 20 + "\n"
+    msg += "=" * 20 + "\n"
     msg += f"来源: {source}\n"
     msg += f"VRChat: {binding.vrc_display_name}\n"
     msg += f"ID: {binding.vrc_user_id}\n"
@@ -270,6 +291,11 @@ whois_cmd = on_command("whois", priority=5, block=True)
 
 @whois_cmd.handle()
 async def handle_whois(bot: Bot, event: GroupMessageEvent):
+    # 检查权限
+    allowed, error_msg = await check_command_permission(bot, event, "whois")
+    if not allowed:
+        await whois_cmd.finish(error_msg)
+    
     raw_msg = event.get_message()
     at_qq = extract_at_qq(raw_msg)
 
@@ -294,7 +320,7 @@ async def handle_whois(bot: Bot, event: GroupMessageEvent):
         await whois_cmd.finish(format_error(error or "无法获取用户信息"))
 
     msg = f"👤 {user.displayName}\n"
-    msg += "─" * 20 + "\n"
+    msg += "=" * 20 + "\n"
     msg += f"状态: {user.status or '离线'}\n"
 
     if user.location and user.location != "offline":

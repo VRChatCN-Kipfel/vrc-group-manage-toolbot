@@ -6,12 +6,13 @@
 import asyncio
 
 from nonebot import on_command, logger
-from nonebot.adapters.onebot.v11 import MessageEvent, Bot, Message
+from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent, Bot, Message
 from nonebot.params import CommandArg
 
 from utils import get_vrc_client, check_vrc_auth
 from services.api_guard import api_guard
-from services.message_utils import format_error
+from services.message_utils import format_error, send_long_message
+from services.permission import check_command_permission, get_permission_level, PermissionLevel
 
 
 # 创建命令处理器
@@ -25,12 +26,35 @@ user_location = on_command("whereis", priority=5)
 async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     """
     查询群组的活跃实例
-    用法: /instances <group_id>
+    - 群聊中：显示当前群绑定的 VRChat 群组的实例
+    - 私聊中：仅超管可用，需要指定 grp_xxx
     """
-    group_id = args.extract_plain_text().strip()
-    
-    if not group_id:
-        await group_instances.finish("请提供群组 ID\n用法: /instances grp_xxx")
+    # 私聊限制：仅超管可用
+    if isinstance(event, PrivateMessageEvent):
+        level = await get_permission_level(bot, event)
+        if level < PermissionLevel.SUPERUSER:
+            await group_instances.finish("❌ 私聊中仅超级管理员可使用此指令")
+        
+        # 私聊中需要指定群组 ID
+        group_id = args.extract_plain_text().strip()
+        if not group_id or not group_id.startswith("grp_"):
+            await group_instances.finish("私聊中用法: #instances <grp_xxx>")
+    else:
+        # 检查权限
+        allowed, error_msg = await check_command_permission(bot, event, "instances")
+        if not allowed:
+            await group_instances.finish(error_msg)
+        
+        # 群聊中使用已绑定的群组
+        from services.group_config import group_config_store
+        config = group_config_store.get(str(event.group_id))
+        group_id = config.default_vrc_group
+        
+        if not group_id:
+            await group_instances.finish(format_error(
+                "当前群聊尚未绑定 VRChat 群组",
+                "请联系超级管理员使用 #bindgroup <grp_xxx> 进行绑定"
+            ))
     
     msg = ""
     client = get_vrc_client()
@@ -75,7 +99,7 @@ async def handle_group_instances(bot: Bot, event: MessageEvent, args: Message = 
         logger.error(f"查询群组实例失败: {e}")
         msg = f"查询失败: {str(e)}"
 
-    await group_instances.finish(msg)
+    await send_long_message(group_instances, msg)
 
 
 @user_location.handle()
@@ -84,6 +108,17 @@ async def handle_user_location(bot: Bot, event: MessageEvent, args: Message = Co
     查询用户当前位置
     用法: /whereis <user_id>
     """
+    # 私聊限制：仅超管可用
+    if isinstance(event, PrivateMessageEvent):
+        level = await get_permission_level(bot, event)
+        if level < PermissionLevel.SUPERUSER:
+            await user_location.finish("❌ 私聊中仅超级管理员可使用此指令")
+    else:
+        # 检查权限
+        allowed, error_msg = await check_command_permission(bot, event, "whereis")
+        if not allowed:
+            await user_location.finish(error_msg)
+    
     user_id = args.extract_plain_text().strip()
     
     if not user_id:
@@ -125,7 +160,7 @@ async def handle_user_location(bot: Bot, event: MessageEvent, args: Message = Co
         logger.error(f"查询用户位置失败: {e}")
         msg = f"查询失败: {str(e)}"
 
-    await user_location.finish(msg)
+    await send_long_message(user_location, msg)
 
 
 # 登录命令
@@ -135,16 +170,22 @@ vrc_login = on_command("vrclLogin", priority=5)
 vrc_2fa = on_command("2fa", priority=5)
 
 _pending_2fa_users: set[str] = set()
+_pending_2fa_tasks: dict[str, asyncio.Task] = {}
 
 
 async def _clear_2fa_after(user_id: str, seconds: int):
     await asyncio.sleep(seconds)
     _pending_2fa_users.discard(user_id)
+    _pending_2fa_tasks.pop(user_id, None)
 
 
 @vrc_login.handle()
 async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    global _pending_2fa
+    # 私聊限制：仅超管可用
+    if isinstance(event, PrivateMessageEvent):
+        level = await get_permission_level(bot, event)
+        if level < PermissionLevel.SUPERUSER:
+            await vrc_login.finish("❌ 私聊中仅超级管理员可使用登录指令")
 
     text = args.extract_plain_text().strip()
 
@@ -159,8 +200,8 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
 
         await vrc_login.send("正在验证 Cookie...")
         user = None
+        client = get_vrc_client()
         try:
-            client = get_vrc_client()
             client.config.auth_cookie = cookie
             client.client = None
             client._authenticated = False
@@ -186,15 +227,19 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
 
     try:
         client = get_vrc_client()
-        result = await client.login()
+        result = await client.login(user_id=str(event.user_id))
     except Exception as e:
         logger.error(f"VRChat 登录异常: {e}")
         await vrc_login.finish(f"登录失败: {str(e)}")
         return
 
     if result == "need_2fa":
-        _pending_2fa_users.add(str(event.user_id))
-        asyncio.create_task(_clear_2fa_after(str(event.user_id), 30))
+        user_key = str(event.user_id)
+        existing = _pending_2fa_tasks.pop(user_key, None)
+        if existing:
+            existing.cancel()
+        _pending_2fa_users.add(user_key)
+        _pending_2fa_tasks[user_key] = asyncio.create_task(_clear_2fa_after(user_key, 30))
         await vrc_login.send("⚠️ 需要两步验证 (TOTP)，请在 30 秒内使用 #2fa <6位验证码>")
         await vrc_login.finish()
         return
@@ -204,8 +249,12 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
 
 @vrc_2fa.handle()
 async def handle_vrc_2fa(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    global _pending_2fa_users
-
+    # 私聊限制：仅超管可用
+    if isinstance(event, PrivateMessageEvent):
+        level = await get_permission_level(bot, event)
+        if level < PermissionLevel.SUPERUSER:
+            await vrc_2fa.finish("❌ 私聊中仅超级管理员可使用此指令")
+    
     user_key = str(event.user_id)
     if user_key not in _pending_2fa_users:
         await vrc_2fa.finish("当前没有待处理的两步验证，请先使用 #vrclLogin")
@@ -220,7 +269,7 @@ async def handle_vrc_2fa(bot: Bot, event: MessageEvent, args: Message = CommandA
 
     try:
         client = get_vrc_client()
-        result = await client.verify_2fa(code)
+        result = await client.verify_2fa(code, user_id=str(event.user_id))
     except Exception as e:
         logger.error(f"VRChat 两步验证异常: {e}")
         _pending_2fa_users.discard(user_key)
@@ -228,6 +277,9 @@ async def handle_vrc_2fa(bot: Bot, event: MessageEvent, args: Message = CommandA
         return
 
     _pending_2fa_users.discard(user_key)
+    task = _pending_2fa_tasks.pop(user_key, None)
+    if task:
+        task.cancel()
     if result is True:
         await _finish_login(vrc_2fa, get_vrc_client(), True)
     else:
@@ -256,6 +308,12 @@ vrc_check = on_command("vrcCheck", priority=5)
 
 @vrc_check.handle()
 async def handle_vrc_check(bot: Bot, event: MessageEvent):
+    # 私聊限制：仅超管可用
+    if isinstance(event, PrivateMessageEvent):
+        level = await get_permission_level(bot, event)
+        if level < PermissionLevel.SUPERUSER:
+            await vrc_check.finish("❌ 私聊中仅超级管理员可使用此指令")
+    
     client = get_vrc_client()
     if not client.config.auth_cookie:
         await vrc_check.finish("❌ 未登录，请使用 #vrclLogin")

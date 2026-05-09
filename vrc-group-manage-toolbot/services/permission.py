@@ -1,6 +1,7 @@
 from enum import IntEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Dict
 
+from nonebot import logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 
 if TYPE_CHECKING:
@@ -8,29 +9,89 @@ if TYPE_CHECKING:
 
 
 class PermissionLevel(IntEnum):
-    USER = 0
-    GROUP_ADMIN = 1
-    SUPERUSER = 2
+    UNBOUND_USER = 0      # 未绑定普通成员
+    BOUND_USER = 1        # 已绑定普通成员
+    UNBOUND_ADMIN = 2     # 未绑定管理员
+    BOUND_ADMIN = 3       # 已绑定管理员
+    OWNER = 4             # 群主
+    SUPERUSER = 5         # 机器人超级管理员
+    
+    @classmethod
+    def from_str(cls, level_str: str) -> "PermissionLevel":
+        """从字符串转换为权限等级"""
+        mapping = {
+            "unbound_user": cls.UNBOUND_USER, "0": cls.UNBOUND_USER,
+            "bound_user": cls.BOUND_USER, "1": cls.BOUND_USER,
+            "unbound_admin": cls.UNBOUND_ADMIN, "2": cls.UNBOUND_ADMIN,
+            "bound_admin": cls.BOUND_ADMIN, "3": cls.BOUND_ADMIN,
+            "owner": cls.OWNER, "4": cls.OWNER,
+            "superuser": cls.SUPERUSER, "5": cls.SUPERUSER,
+        }
+        return mapping[level_str.strip().lower()]
+
+
+# 临时权限存储: {qq_id: PermissionLevel}
+_temp_permissions: Dict[str, PermissionLevel] = {}
 
 
 async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> PermissionLevel:
+    from .user_binding import user_binding_store
+    
     user_id = event.user_id
-
-    if str(user_id) in bot.config.superusers:
-        return PermissionLevel.SUPERUSER
-
     sender = event.sender
-    if sender.role in ("admin", "owner"):
-        return PermissionLevel.GROUP_ADMIN
+    qq_id = str(user_id)
+    
+    # 0. 检查是否有临时设定的权限 (优先级最高)
+    temp = _temp_permissions.get(qq_id)
+    if temp is not None:
+        return temp
+    
+    # 1. 检查是否为机器人超管 (Lv5)
+    if qq_id in bot.config.superusers:
+        return PermissionLevel.SUPERUSER
+    
+    # 2. 检查是否为群主 (Lv4)
+    sender_role = getattr(sender, 'role', None)  # PrivateMessageEvent 无 role 属性
+    if sender_role == "owner":
+        return PermissionLevel.OWNER
+    
+    # 3. 检查是否为管理员 (Lv2 or Lv3)
+    if sender_role == "admin":
+        # 检查是否已绑定
+        binding = user_binding_store.get_by_qq(qq_id)
+        if binding and binding.confirmed:
+            return PermissionLevel.BOUND_ADMIN
+        else:
+            return PermissionLevel.UNBOUND_ADMIN
+    
+    # 4. 检查普通成员 (Lv0 or Lv1)
+    binding = user_binding_store.get_by_qq(qq_id)
+    if binding and binding.confirmed:
+        return PermissionLevel.BOUND_USER
+    else:
+        return PermissionLevel.UNBOUND_USER
 
-    return PermissionLevel.USER
+
+def set_temp_permission(qq_id: str, level: PermissionLevel):
+    """设置临时权限（仅本次运行生效）"""
+    _temp_permissions[str(qq_id)] = level
+
+
+def clear_temp_permission(qq_id: str):
+    """清除临时权限"""
+    _temp_permissions.pop(str(qq_id), None)
+
+
+def get_all_temp_permissions() -> Dict[str, PermissionLevel]:
+    """获取所有临时权限设置"""
+    return _temp_permissions.copy()
 
 
 async def check_vrc_group_role(
     vrc_client: "VRCClient",
     user_id: str,
     group_id: str,
-    required_roles: list = None,
+    required_roles: Optional[list] = None,
 ) -> bool:
     if required_roles is None:
         required_roles = ["owner", "moderator"]
@@ -48,5 +109,55 @@ async def check_vrc_group_role(
             if role and role.name.lower() in required_roles:
                 return True
         return False
-    except Exception:
+    except Exception as e:
+        logger.warning(f"check_vrc_group_role failed: {e}")
         return False
+
+
+async def check_command_permission(
+    bot: Bot,
+    event: GroupMessageEvent,
+    command_name: str,
+    required_level: Optional[PermissionLevel] = None,
+) -> tuple[bool, str]:
+    """
+    检查用户是否有权限执行指定命令
+    
+    Args:
+        bot: Bot实例
+        event: 事件对象
+        command_name: 命令名称
+        required_level: 要求的最低权限等级（如果为None则从配置中读取）
+    
+    Returns:
+        (是否有权限, 错误消息)
+    """
+    from .group_config import group_config_store
+    
+    # 获取当前群的配置
+    config = group_config_store.get(str(event.group_id))
+    
+    # 获取用户的权限等级
+    user_level = await get_permission_level(bot, event)
+    
+    # 如果未指定required_level，从配置中读取
+    if required_level is None:
+        required_level = config.get_command_permission(command_name)
+    
+    # 检查功能是否启用
+    if not config.is_command_enabled(command_name):
+        return False, f"❌ 命令 #{command_name} 在此群已被禁用"
+    
+    # 检查权限等级
+    if user_level < required_level:
+        level_names = {
+            PermissionLevel.UNBOUND_USER: "未绑定成员",
+            PermissionLevel.BOUND_USER: "已绑定成员",
+            PermissionLevel.UNBOUND_ADMIN: "未绑定管理员",
+            PermissionLevel.BOUND_ADMIN: "已绑定管理员",
+            PermissionLevel.OWNER: "群主",
+            PermissionLevel.SUPERUSER: "超级管理员",
+        }
+        return False, f"❌ 权限不足：需要{level_names.get(required_level, '未知')}权限"
+    
+    return True, ""

@@ -8,3 +8,4 @@ __pycache__/
 .env.prod
 *.log
 .venv/
+.kilo/
