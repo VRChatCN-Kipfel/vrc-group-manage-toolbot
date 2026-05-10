@@ -150,3 +150,52 @@ class TestGroupManagerFunctions:
         assert callable(handle_group_instances)
         assert callable(handle_user_location)
         assert callable(handle_vrc_login)
+
+
+class TestGroupManagerIntegration:
+    """群组管理集成测试"""
+    
+    @pytest.mark.asyncio
+    async def test_command_imports_correctly(self, app: App):
+        """
+        实测试：命令正确导入
+        
+        验证所有命令都能从模块中正确导入
+        """
+        from plugins.group_manager import (
+            group_instances,
+            user_location,
+            vrc_login,
+            vrc_2fa,
+        )
+        
+        bot, ctx = await create_mock_bot(app)
+        
+        # 验证所有命令都存在
+        assert group_instances is not None
+        assert user_location is not None
+        assert vrc_login is not None
+        assert vrc_2fa is not None
+    
+    @pytest.mark.asyncio
+    async def test_module_has_all_handlers(self, app: App):
+        """
+        实测试：模块包含所有处理器
+        
+        验证模块定义了所有必要的处理函数
+        """
+        import plugins.group_manager as gm
+        
+        bot, ctx = await create_mock_bot(app)
+        
+        # 验证关键函数存在
+        required_functions = [
+            'handle_group_instances',
+            'handle_user_location',
+            'handle_vrc_login',
+            '_clear_2fa_after',
+        ]
+        
+        for func_name in required_functions:
+            assert hasattr(gm, func_name), f"缺少函数: {func_name}"
+            assert callable(getattr(gm, func_name)), f"{func_name} 不可调用"

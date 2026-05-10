@@ -165,8 +165,12 @@ class TestUserBindingReal:
         
         bot, ctx = await create_mock_bot(app)
         
+        # 确保这个 ID 不存在（先删除如果存在）
+        test_qq = "999999999"
+        user_binding_store.remove(test_qq)
+        
         # 查询不存在的 QQ
-        result = user_binding_store.get_by_qq("999999999")
+        result = user_binding_store.get_by_qq(test_qq)
         assert result is None
     
     @pytest.mark.asyncio

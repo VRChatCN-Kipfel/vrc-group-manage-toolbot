@@ -127,3 +127,75 @@ class TestGroupAdminCommands:
         assert callable(handle_gmembers)
         assert callable(handle_ginvite)
         assert callable(handle_gkick_pre)
+
+
+class TestGroupAdminIntegration:
+    """群组管理员集成测试"""
+    
+    @pytest.mark.asyncio
+    async def test_all_commands_exist(self, app: App):
+        """
+        实测试：所有命令都存在
+        
+        验证所有群组管理命令都已注册
+        """
+        from plugins.group_admin import (
+            gmembers_cmd,
+            ginvite_cmd,
+            gkick_cmd,
+            gban_cmd,
+            gunban_cmd,
+            grole_cmd,
+            grequests_cmd,
+            gaccept_cmd,
+            greject_cmd,
+            gannounce_cmd,
+            gdelannounce_cmd,
+            gaudit_cmd,
+        )
+        
+        bot, ctx = await create_mock_bot(app)
+        
+        # 验证所有命令都存在
+        commands = [
+            gmembers_cmd,
+            ginvite_cmd,
+            gkick_cmd,
+            gban_cmd,
+            gunban_cmd,
+            grole_cmd,
+            grequests_cmd,
+            gaccept_cmd,
+            greject_cmd,
+            gannounce_cmd,
+            gdelannounce_cmd,
+            gaudit_cmd,
+        ]
+        
+        for cmd in commands:
+            assert cmd is not None
+            assert hasattr(cmd, 'handle')
+    
+    @pytest.mark.asyncio
+    async def test_module_structure(self, app: App):
+        """
+        实测试：模块结构完整
+        
+        验证模块包含所有必要的组件
+        """
+        import plugins.group_admin as ga
+        
+        bot, ctx = await create_mock_bot(app)
+        
+        # 验证关键组件存在
+        required_items = [
+            'gmembers_cmd',
+            'ginvite_cmd',
+            'gkick_cmd',
+            'handle_gmembers',
+            'handle_ginvite',
+            'handle_gkick_pre',
+        ]
+        
+        for item_name in required_items:
+            assert hasattr(ga, item_name), f"缺少组件: {item_name}"
