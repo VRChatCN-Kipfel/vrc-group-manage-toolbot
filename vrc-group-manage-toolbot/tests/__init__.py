@@ -72,3 +72,92 @@ def get_test_user_id(index: int = 1) -> str:
         纯数字字符串格式的用户 ID
     """
     return f"100000000{index}"
+
+
+# ============================================================================
+# 消息事件模拟工具（用于 nonebug 测试）
+# ============================================================================
+
+def create_group_message_event(
+    user_id: str,
+    group_id: str,
+    message: str,
+    role: str = "member",
+    sender_nick: str = "TestUser",
+):
+    """
+    创建群聊消息事件
+    
+    Args:
+        user_id: 发送者 QQ 号
+        group_id: 群号
+        message: 消息内容
+        role: 角色 (owner/admin/member)
+        sender_nick: 发送者昵称
+        
+    Returns:
+        事件字典，可用于 ctx.receive()
+    """
+    from nonebot.adapters.onebot.v11 import Message
+    
+    return {
+        "post_type": "message",
+        "message_type": "group",
+        "sub_type": "normal",
+        "time": 1234567890,
+        "self_id": 2085564820,
+        "user_id": int(user_id),
+        "message_id": 1,
+        "group_id": int(group_id),
+        "message": Message(message),
+        "raw_message": message,
+        "font": 0,
+        "sender": {
+            "user_id": int(user_id),
+            "nickname": sender_nick,
+            "card": "",
+            "sex": "unknown",
+            "age": 0,
+            "area": "",
+            "level": "1",
+            "role": role,
+        },
+    }
+
+
+def create_private_message_event(
+    user_id: str,
+    message: str,
+    sender_nick: str = "TestUser",
+):
+    """
+    创建私聊消息事件
+    
+    Args:
+        user_id: 发送者 QQ 号
+        message: 消息内容
+        sender_nick: 发送者昵称
+        
+    Returns:
+        事件字典，可用于 ctx.receive()
+    """
+    from nonebot.adapters.onebot.v11 import Message
+    
+    return {
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "time": 1234567890,
+        "self_id": 2085564820,
+        "user_id": int(user_id),
+        "message_id": 1,
+        "message": Message(message),
+        "raw_message": message,
+        "font": 0,
+        "sender": {
+            "user_id": int(user_id),
+            "nickname": sender_nick,
+            "sex": "unknown",
+            "age": 0,
+        },
+    }

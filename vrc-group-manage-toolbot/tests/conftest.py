@@ -90,6 +90,6 @@ def cleanup_user_after_test(test_user_id):
     
     # ===== Teardown: 测试后清理 =====
     from services.user_binding import user_binding_store
-    if test_user_id in user_binding_store.bindings:
-        del user_binding_store.bindings[test_user_id]
-        user_binding_store.save()
+    if test_user_id in user_binding_store._bindings:
+        del user_binding_store._bindings[test_user_id]
+        user_binding_store._save()
