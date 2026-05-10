@@ -26,7 +26,7 @@ if str(project_root) not in sys.path:
 # 测试工具函数（纯函数，无副作用）
 # ============================================================================
 
-async def create_mock_bot(app: App, self_id: str = "2085564820"):
+async def create_mock_bot(app: App, self_id: str = "1000000000"):  # 测试用Bot QQ号（非真实账号）
     """
     创建模拟 Bot 实例
     
@@ -105,7 +105,7 @@ def create_group_message_event(
         "message_type": "group",
         "sub_type": "normal",
         "time": 1234567890,
-        "self_id": 2085564820,
+        "self_id": 1000000000,
         "user_id": int(user_id),
         "message_id": 1,
         "group_id": int(group_id),
@@ -148,7 +148,7 @@ def create_private_message_event(
         "message_type": "private",
         "sub_type": "friend",
         "time": 1234567890,
-        "self_id": 2085564820,
+        "self_id": 1000000000,
         "user_id": int(user_id),
         "message_id": 1,
         "message": Message(message),
