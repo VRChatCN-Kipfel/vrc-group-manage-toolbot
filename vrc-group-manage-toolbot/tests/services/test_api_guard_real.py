@@ -388,3 +388,88 @@ class TestApiGuardHttpErrors:
         assert success is False
         assert result is None
         assert "网络异常" in error
+
+class TestApiGuardCache:
+    @pytest.mark.asyncio
+    async def test_cache_hit(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        guard.cache_set("test_cache_hit", {"cached": True}, 30)
+        call_made = [False]
+
+        async def mock_api():
+            call_made[0] = True
+            return {"fresh": True}
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test", _cache_key="test_cache_hit"
+        )
+
+        assert success is True
+        assert result == {"cached": True}
+        assert error is None
+        assert call_made[0] is False
+
+    @pytest.mark.asyncio
+    async def test_cache_set_on_success(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            return {"fresh": True}
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test", _cache_key="test_cache_set"
+        )
+
+        assert success is True
+        cached = guard.cache_get("test_cache_set")
+        assert cached == {"fresh": True}
+
+    @pytest.mark.asyncio
+    async def test_call_with_400_json_exception(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        resp = Mock()
+        resp.status_code = 400
+        resp.json.side_effect = ValueError("bad json")
+        error_400 = httpx.HTTPStatusError("400 bad request", request=Mock(), response=resp)
+
+        async def mock_api():
+            raise error_400
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_400_json"
+        )
+
+        assert success is False
+        assert result is None
+        # detail extraction failed, falls back to empty detail
+        assert error is not None
+
+    @pytest.mark.asyncio
+    async def test_call_with_unknown_exception(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise ValueError("something wrong")
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test"
+        )
+
+        assert success is False
+        assert result is None
+        assert "error" in error.lower() or "wrong" in error
+

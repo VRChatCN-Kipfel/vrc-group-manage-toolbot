@@ -390,3 +390,223 @@ class TestPermissionOrdering:
         assert PermissionLevel.BOUND_ADMIN >= PermissionLevel.UNBOUND_ADMIN
         assert PermissionLevel.OWNER != PermissionLevel.SUPERUSER
         assert PermissionLevel.SUPERUSER == PermissionLevel.SUPERUSER
+
+class TestTempPermissions:
+    @pytest.mark.asyncio
+    async def test_set_temp_permission(self, app: App):
+        from services.permission import set_temp_permission, clear_temp_permission, get_all_temp_permissions, PermissionLevel
+
+        bot, ctx = await create_mock_bot(app)
+        test_qq = "31415926535"
+
+        set_temp_permission(test_qq, PermissionLevel.UNBOUND_ADMIN)
+        all_temp = get_all_temp_permissions()
+        assert test_qq in all_temp
+        assert all_temp[test_qq] == PermissionLevel.UNBOUND_ADMIN
+
+        clear_temp_permission(test_qq)
+        all_temp2 = get_all_temp_permissions()
+        assert test_qq not in all_temp2
+
+    @pytest.mark.asyncio
+    async def test_temp_permission_affects_get_level(self, app: App):
+        from services.permission import get_permission_level, set_temp_permission, clear_temp_permission, PermissionLevel
+        from unittest.mock import Mock
+
+        bot, ctx = await create_mock_bot(app)
+        test_qq = "27182818285"
+
+        event = Mock()
+        event.user_id = int(test_qq)
+        event.sender.role = "member"
+        from nonebot.adapters.onebot.v11 import GroupMessageEvent
+        event.__class__ = GroupMessageEvent
+
+        level_before = await get_permission_level(bot, event)
+        assert level_before == PermissionLevel.UNBOUND_USER
+
+        set_temp_permission(test_qq, PermissionLevel.OWNER)
+        level_after = await get_permission_level(bot, event)
+        assert level_after == PermissionLevel.OWNER
+
+        clear_temp_permission(test_qq)
+
+    @pytest.mark.asyncio
+    async def test_superuser_path(self, app: App):
+        from services.permission import get_permission_level, PermissionLevel
+        from unittest.mock import Mock
+
+        bot, ctx = await create_mock_bot(app)
+        superusers = bot.config.superusers
+        assert superusers, "no superusers configured"
+        superuser_id = next(iter(superusers))
+
+        event = Mock()
+        event.user_id = int(superuser_id)
+        event.sender.role = "member"
+        from nonebot.adapters.onebot.v11 import GroupMessageEvent
+        event.__class__ = GroupMessageEvent
+
+        level = await get_permission_level(bot, event)
+        assert level == PermissionLevel.SUPERUSER
+
+    @pytest.mark.asyncio
+    async def test_member_with_binding_become_bound(self, app: App):
+        from services.permission import get_permission_level, PermissionLevel
+        from services.user_binding import user_binding_store, BindingRecord
+        from unittest.mock import Mock
+        import time
+
+        bot, ctx = await create_mock_bot(app)
+        test_user_id = "1000000030"
+
+        binding = BindingRecord(
+            qq_id=test_user_id,
+            vrc_user_id="usr_member",
+            vrc_display_name="Member",
+            bound_at=time.time(),
+            confirmed=True,
+        )
+        user_binding_store.set(binding)
+
+        event = Mock()
+        event.user_id = int(test_user_id)
+        event.sender.role = "member"
+        from nonebot.adapters.onebot.v11 import GroupMessageEvent
+        event.__class__ = GroupMessageEvent
+
+        level = await get_permission_level(bot, event)
+        assert level == PermissionLevel.BOUND_USER
+
+        user_binding_store.remove(test_user_id)
+
+class TestPermissionPrivateChat:
+    @pytest.mark.asyncio
+    async def test_get_permission_level_private_unbound(self, app: App):
+        from services.permission import get_permission_level, PermissionLevel
+        from unittest.mock import Mock
+
+        bot, ctx = await create_mock_bot(app)
+
+        event = Mock()
+        event.user_id = 1111111111
+        from nonebot.adapters.onebot.v11 import PrivateMessageEvent
+        event.__class__ = PrivateMessageEvent
+
+        level = await get_permission_level(bot, event)
+        assert level == PermissionLevel.UNBOUND_USER
+
+    @pytest.mark.asyncio
+    async def test_get_permission_level_private_bound(self, app: App):
+        from services.permission import get_permission_level, PermissionLevel
+        from services.user_binding import user_binding_store, BindingRecord
+        from unittest.mock import Mock
+        import time
+
+        bot, ctx = await create_mock_bot(app)
+        test_qq = "31415926535"
+
+        binding = BindingRecord(
+            qq_id=test_qq,
+            vrc_user_id="usr_priv",
+            vrc_display_name="PrivateUser",
+            bound_at=time.time(),
+            confirmed=True,
+        )
+        user_binding_store.set(binding)
+
+        event = Mock()
+        event.user_id = int(test_qq)
+        from nonebot.adapters.onebot.v11 import PrivateMessageEvent
+        event.__class__ = PrivateMessageEvent
+
+        level = await get_permission_level(bot, event)
+        assert level == PermissionLevel.BOUND_USER
+
+        user_binding_store.remove(test_qq)
+
+    @pytest.mark.asyncio
+    async def test_check_command_permission_private_sufficient(self, app: App):
+        from services.permission import check_command_permission, PermissionLevel
+        from services.user_binding import user_binding_store, BindingRecord
+        from unittest.mock import Mock
+        import time
+
+        bot, ctx = await create_mock_bot(app)
+        test_qq = "27182818285"
+
+        binding = BindingRecord(
+            qq_id=test_qq,
+            vrc_user_id="usr_priv_cmd",
+            vrc_display_name="PrivateCmd",
+            bound_at=time.time(),
+            confirmed=True,
+        )
+        user_binding_store.set(binding)
+
+        event = Mock()
+        event.user_id = int(test_qq)
+        from nonebot.adapters.onebot.v11 import PrivateMessageEvent
+        event.__class__ = PrivateMessageEvent
+
+        has_perm, msg = await check_command_permission(
+            bot, event, "bindinfo", required_level=PermissionLevel.BOUND_USER
+        )
+
+        assert has_perm is True
+        assert msg == ""
+
+        user_binding_store.remove(test_qq)
+
+    @pytest.mark.asyncio
+    async def test_check_command_permission_private_insufficient(self, app: App):
+        from services.permission import check_command_permission, PermissionLevel
+        from unittest.mock import Mock
+
+        bot, ctx = await create_mock_bot(app)
+
+        event = Mock()
+        event.user_id = 9999999999
+        from nonebot.adapters.onebot.v11 import PrivateMessageEvent
+        event.__class__ = PrivateMessageEvent
+
+        has_perm, msg = await check_command_permission(
+            bot, event, "gban", required_level=PermissionLevel.SUPERUSER
+        )
+
+        assert has_perm is False
+        assert "not enough" in msg.lower() or "权限" in msg
+
+    @pytest.mark.asyncio
+    async def test_check_command_permission_group_sufficient(self, app: App):
+        from services.permission import check_command_permission, PermissionLevel
+        from services.group_config import group_config_store
+        from unittest.mock import Mock
+
+        bot, ctx = await create_mock_bot(app)
+        test_user_id = "1000000041"
+        test_group_id = "1000000041"
+
+        config = group_config_store.get(test_group_id)
+        config.set_command_enabled("whereis", True)
+        config.set_command_permission("whereis", PermissionLevel.UNBOUND_USER)
+        group_config_store.set(config)
+
+        event = Mock()
+        event.user_id = int(test_user_id)
+        event.group_id = int(test_group_id)
+        event.sender.role = "member"
+        from nonebot.adapters.onebot.v11 import GroupMessageEvent
+        event.__class__ = GroupMessageEvent
+        event.__module__ = "nonebot.adapters.onebot.v11"
+
+        has_perm, msg = await check_command_permission(
+            bot, event, "whereis"
+        )
+
+        assert has_perm is True
+        assert msg == ""
+
+        config.commands.clear()
+        group_config_store.set(config)
+

@@ -99,17 +99,22 @@ def cleanup_user_after_test(test_user_id):
 # ============================================================================
 
 def pytest_sessionfinish(session, exitstatus):
-    from services.group_config import group_config_store
-    from services.user_binding import user_binding_store
-    
-    for gid in list(group_config_store._configs.keys()):
-        if str(gid).startswith("10000000"):
-            config = group_config_store._configs[gid]
-            config.commands.clear()
-            group_config_store.set(config)
-    
-    for uid in list(user_binding_store._bindings.keys()):
-        if str(uid).startswith("10000000"):
-            del user_binding_store._bindings[uid]
-    user_binding_store._save()
+    try:
+        from services.group_config import group_config_store
+        for gid in list(group_config_store._configs.keys()):
+            if str(gid).startswith("10000000"):
+                config = group_config_store._configs[gid]
+                config.commands.clear()
+                group_config_store.set(config)
+    except Exception:
+        pass
+
+    try:
+        from services.user_binding import user_binding_store
+        for uid in list(user_binding_store._bindings.keys()):
+            if str(uid).startswith("10000000"):
+                del user_binding_store._bindings[uid]
+        user_binding_store._save()
+    except Exception:
+        pass
 
