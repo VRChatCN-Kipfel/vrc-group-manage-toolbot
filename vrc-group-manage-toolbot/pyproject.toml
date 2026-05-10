@@ -11,6 +11,16 @@ dependencies = [
     "nonebug>=0.4.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "nonebug>=0.4.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "httpx>=0.24.0",
+]
+
 [tool.nonebot]
 plugin_dirs = ["plugins"]
 builtin_plugins = ["echo", "single_session"]
@@ -32,3 +42,10 @@ python_files = ["test_*.py", "__init__.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+[tool.setuptools.packages.find]
+include = ["plugins*", "services*", "utils*", "data*"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
