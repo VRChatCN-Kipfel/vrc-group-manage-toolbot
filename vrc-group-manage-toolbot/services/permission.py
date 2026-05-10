@@ -2,7 +2,7 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Optional, Dict
 
 from nonebot import logger
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, MessageEvent
 
 if TYPE_CHECKING:
     from utils import VRCClient
@@ -34,7 +34,7 @@ class PermissionLevel(IntEnum):
 _temp_permissions: Dict[str, PermissionLevel] = {}
 
 
-async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> PermissionLevel:
+async def get_permission_level(bot: Bot, event: MessageEvent) -> PermissionLevel:
     from .user_binding import user_binding_store
     
     user_id = event.user_id
@@ -50,12 +50,21 @@ async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> Permission
     if qq_id in bot.config.superusers:
         return PermissionLevel.SUPERUSER
     
-    # 2. 检查是否为群主 (Lv4)
-    sender_role = getattr(sender, 'role', None)  # PrivateMessageEvent 无 role 属性
+    # 2. 私聊事件：只能是超管或普通用户
+    if isinstance(event, PrivateMessageEvent):
+        # 私聊中没有群角色概念，返回未绑定用户或已绑定用户
+        binding = user_binding_store.get_by_qq(qq_id)
+        if binding and binding.confirmed:
+            return PermissionLevel.BOUND_USER
+        else:
+            return PermissionLevel.UNBOUND_USER
+    
+    # 3. 群聊事件：检查群角色
+    sender_role = getattr(sender, 'role', None)
     if sender_role == "owner":
         return PermissionLevel.OWNER
     
-    # 3. 检查是否为管理员 (Lv2 or Lv3)
+    # 4. 检查是否为管理员 (Lv2 or Lv3)
     if sender_role == "admin":
         # 检查是否已绑定
         binding = user_binding_store.get_by_qq(qq_id)
@@ -64,7 +73,7 @@ async def get_permission_level(bot: Bot, event: GroupMessageEvent) -> Permission
         else:
             return PermissionLevel.UNBOUND_ADMIN
     
-    # 4. 检查普通成员 (Lv0 or Lv1)
+    # 5. 检查普通成员 (Lv0 or Lv1)
     binding = user_binding_store.get_by_qq(qq_id)
     if binding and binding.confirmed:
         return PermissionLevel.BOUND_USER
@@ -116,7 +125,7 @@ async def check_vrc_group_role(
 
 async def check_command_permission(
     bot: Bot,
-    event: GroupMessageEvent,
+    event: MessageEvent,
     command_name: str,
     required_level: Optional[PermissionLevel] = None,
 ) -> tuple[bool, str]:
@@ -125,7 +134,7 @@ async def check_command_permission(
     
     Args:
         bot: Bot实例
-        event: 事件对象
+        event: 事件对象（可以是群聊或私聊）
         command_name: 命令名称
         required_level: 要求的最低权限等级（如果为None则从配置中读取）
     
@@ -134,7 +143,31 @@ async def check_command_permission(
     """
     from .group_config import group_config_store
     
-    # 获取当前群的配置
+    # 私聊事件：不使用群组配置，直接检查权限等级
+    if isinstance(event, PrivateMessageEvent):
+        user_level = await get_permission_level(bot, event)
+        
+        # 如果未指定required_level，使用默认最低权限
+        if required_level is None:
+            from .group_config import COMMAND_DEFAULTS
+            defaults = COMMAND_DEFAULTS.get(command_name, {})
+            required_level = defaults.get("permission", PermissionLevel.UNBOUND_USER)
+        
+        # 检查权限等级
+        if user_level < required_level:
+            level_names = {
+                PermissionLevel.UNBOUND_USER: "未绑定成员",
+                PermissionLevel.BOUND_USER: "已绑定成员",
+                PermissionLevel.UNBOUND_ADMIN: "未绑定管理员",
+                PermissionLevel.BOUND_ADMIN: "已绑定管理员",
+                PermissionLevel.OWNER: "群主",
+                PermissionLevel.SUPERUSER: "超级管理员",
+            }
+            return False, f"❌ 权限不足：需要{level_names.get(required_level, '未知')}权限"
+        
+        return True, ""
+    
+    # 群聊事件：使用群组配置
     config = group_config_store.get(str(event.group_id))
     
     # 获取用户的权限等级
