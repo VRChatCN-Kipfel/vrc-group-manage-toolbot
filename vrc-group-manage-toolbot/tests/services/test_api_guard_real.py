@@ -4,6 +4,7 @@ API 守卫服务测试 - 实测试
 测试 API 限流、重试、缓存等功能
 """
 import asyncio
+from typing import Optional
 import pytest
 import httpx
 from unittest.mock import Mock, AsyncMock, patch
@@ -208,7 +209,7 @@ class TestApiGuardReal:
         assert isinstance(stats, dict)
 
 
-def _make_http_error(status: int, json_body: dict | None = None):
+def _make_http_error(status: int, json_body: Optional[dict] = None):
     resp = Mock()
     resp.status_code = status
     resp.json.return_value = json_body or {}
