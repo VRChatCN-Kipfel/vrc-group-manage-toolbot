@@ -116,7 +116,7 @@ class TestUserBindPermission:
         from plugins.user_bind import bind_cmd
         from tests import create_private_message_event
         
-        bot, ctx = await create_mock_bot(app, self_id="2085564820")
+        bot, ctx = await create_mock_bot(app, self_id="1000000000")
         test_user_id = get_test_user_id()  # 非超管
         
         # 创建私聊消息事件
@@ -139,8 +139,8 @@ class TestUserBindPermission:
         from plugins.user_bind import bind_cmd
         from tests import create_private_message_event
         
-        bot, ctx = await create_mock_bot(app, self_id="2085564820")
-        superuser_id = "2085564820"  # 超管
+        bot, ctx = await create_mock_bot(app, self_id="1000000000")
+        superuser_id = "1000000000"  # 超管
         
         # 创建私聊消息事件
         event = create_private_message_event(
