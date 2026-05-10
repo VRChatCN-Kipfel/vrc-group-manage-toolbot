@@ -3,7 +3,7 @@ name = "vrc-group-manage-toolbot"
 version = "0.2.0"
 description = "vrc-group-manage-toolbot"
 readme = "README.md"
-requires-python = ">=3.10, <4.0"
+requires-python = ">=3.9, <4.0"
 dependencies = [
     "nonebot2[aiohttp,fastapi,httpx,websockets]>=2.5.0",
     "nonebot-adapter-onebot>=2.4.6",

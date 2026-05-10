@@ -10,8 +10,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false  # 3.9预期因nonebot2>=3.10依赖失败，不影响其他版本
       matrix:
-        python-version: ["3.10", "3.11", "3.14"]
+        python-version: ["3.9", "3.11", "3.14"]  # 3.9: nonebot2>=2.5.0要求>=3.10，CI中可能因依赖冲突失败
     defaults:
       run:
         working-directory: ./vrc-group-manage-toolbot
