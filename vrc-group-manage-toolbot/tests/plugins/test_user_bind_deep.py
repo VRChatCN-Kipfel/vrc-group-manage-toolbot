@@ -13,6 +13,7 @@ class TestUserBindDeep:
     """用户绑定深度测试示例"""
     
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="TODO: pending message interaction test")
     async def test_bind_command_missing_parameter(self, app: App):
         """
         实测试：bind 命令缺少参数
@@ -47,6 +48,7 @@ class TestUserBindDeep:
         pass
     
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="TODO: pending message interaction test")
     async def test_bind_command_with_invalid_id(self, app: App):
         """
         实测试：bind 命令使用无效的 VRC ID
@@ -71,6 +73,7 @@ class TestUserBindDeep:
         pass
     
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="TODO: pending message interaction test")
     async def test_bind_command_already_bound(self, app: App, cleanup_after_test, cleanup_user_after_test):
         """
         实测试：已绑定用户再次绑定
@@ -103,6 +106,7 @@ class TestUserBindPermission:
     """用户绑定权限深度测试"""
     
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="TODO: pending message interaction test")
     async def test_bind_in_private_chat_non_superuser(self, app: App):
         """
         实测试：私聊中非超管使用 bind
@@ -125,6 +129,7 @@ class TestUserBindPermission:
         pass
     
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="TODO: pending message interaction test")
     async def test_bind_in_private_chat_superuser(self, app: App):
         """
         实测试：私聊中超管使用 bind

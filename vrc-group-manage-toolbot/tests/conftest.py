@@ -93,3 +93,23 @@ def cleanup_user_after_test(test_user_id):
     if test_user_id in user_binding_store._bindings:
         del user_binding_store._bindings[test_user_id]
         user_binding_store._save()
+
+# ============================================================================
+# Hooks - pytest hooks for forced cleanup after test crashes
+# ============================================================================
+
+def pytest_sessionfinish(session, exitstatus):
+    from services.group_config import group_config_store
+    from services.user_binding import user_binding_store
+    
+    for gid in list(group_config_store._configs.keys()):
+        if str(gid).startswith("10000000"):
+            config = group_config_store._configs[gid]
+            config.commands.clear()
+            group_config_store.set(config)
+    
+    for uid in list(user_binding_store._bindings.keys()):
+        if str(uid).startswith("10000000"):
+            del user_binding_store._bindings[uid]
+    user_binding_store._save()
+
