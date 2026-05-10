@@ -127,3 +127,38 @@ class TestMessageUtilsReal:
         query1 = format_query_result("title", "content")
         query2 = format_query_result("title", "content")
         assert query1 == query2
+
+
+class TestSendLongMessage:
+    @pytest.mark.asyncio
+    async def test_short_text(self, app: App):
+        from unittest.mock import AsyncMock
+        from services.message_utils import send_long_message
+
+        bot, ctx = await create_mock_bot(app)
+        matcher = AsyncMock()
+        short_text = "Hello world"
+
+        await send_long_message(matcher, short_text)
+
+        matcher.finish.assert_called_once_with(short_text)
+        matcher.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_long_text(self, app: App):
+        from unittest.mock import AsyncMock
+        from services.message_utils import send_long_message, MAX_MESSAGE_LENGTH
+
+        bot, ctx = await create_mock_bot(app)
+        matcher = AsyncMock()
+
+        chunk_count = 3
+        long_text = "A" * (MAX_MESSAGE_LENGTH * (chunk_count - 1) + 100)
+
+        await send_long_message(matcher, long_text)
+
+        assert matcher.send.call_count == chunk_count - 1
+        assert matcher.finish.call_count == 1
+
+        last_chunk = matcher.finish.call_args[0][0]
+        assert len(last_chunk) <= MAX_MESSAGE_LENGTH

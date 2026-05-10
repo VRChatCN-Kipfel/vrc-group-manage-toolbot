@@ -4,6 +4,8 @@ VRC 工具模块测试 - 实测试
 测试 VRC 客户端、数据模型、配置的完整功能
 """
 import pytest
+import httpx
+from unittest.mock import Mock, AsyncMock, patch
 from nonebug import App
 from tests import create_mock_bot, get_test_user_id
 
@@ -351,3 +353,446 @@ class TestVRCConfigReal:
         
         assert config.username == "test_user"
         assert config.auth_cookie is None
+
+
+class TestVrcClientApi:
+    @pytest.mark.asyncio
+    async def test_get_current_user(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={
+            "id": "usr_001", "displayName": "TestUser", "username": "test"
+        })):
+            user = await client.get_current_user()
+
+        assert user is not None
+        assert user.id == "usr_001"
+        assert user.displayName == "TestUser"
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_401(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 401
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("401", request=Mock(), response=mock_resp)
+        )):
+            user = await client.get_current_user()
+
+        assert user is None
+
+    @pytest.mark.asyncio
+    async def test_get_group(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={
+            "id": "grp_001", "name": "TestGroup", "shortCode": "TEST"
+        })):
+            group = await client.get_group("grp_001")
+
+        assert group is not None
+        assert group.id == "grp_001"
+        assert group.name == "TestGroup"
+
+    @pytest.mark.asyncio
+    async def test_get_group_404(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 404
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("404", request=Mock(), response=mock_resp)
+        )):
+            group = await client.get_group("grp_999")
+
+        assert group is None
+
+    @pytest.mark.asyncio
+    async def test_get_group_member(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={
+            "id": "mem_001", "groupId": "grp_001", "userId": "usr_001",
+            "roleIds": ["role_admin"], "isRepresenting": True
+        })):
+            member = await client.get_group_member("grp_001", "usr_001")
+
+        assert member is not None
+        assert member.userId == "usr_001"
+        assert member.roleIds == ["role_admin"]
+
+    @pytest.mark.asyncio
+    async def test_get_group_member_404(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 404
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("404", request=Mock(), response=mock_resp)
+        )):
+            member = await client.get_group_member("grp_001", "nonexistent_user")
+
+        assert member is None
+
+    @pytest.mark.asyncio
+    async def test_get_group_roles(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value=[
+            {"id": "role_001", "name": "Admin", "isManagement": True},
+            {"id": "role_002", "name": "Member", "isManagement": False},
+        ])):
+            roles = await client.get_group_roles("grp_001")
+
+        assert len(roles) == 2
+        assert roles[0].name == "Admin"
+
+    @pytest.mark.asyncio
+    async def test_get_group_instances(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value=[
+            {"instanceId": "wrld_001:12345~public(usr_001)", "memberCount": 5, "worldName": "TestWorld"}
+        ])):
+            instances = await client.get_group_instances("grp_001")
+
+        assert len(instances) == 1
+        assert instances[0].id == "wrld_001:12345~public(usr_001)"
+
+    @pytest.mark.asyncio
+    async def test_get_instance(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={
+            "instanceId": "wrld_001:12345~public", "memberCount": 10, "worldName": "TestWorld"
+        })):
+            instance = await client.get_instance("wrld_001:12345~public")
+
+        assert instance is not None
+        assert instance.id == "wrld_001:12345~public"
+
+    @pytest.mark.asyncio
+    async def test_get_instance_404(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 404
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("404", request=Mock(), response=mock_resp)
+        )):
+            instance = await client.get_instance("nonexistent")
+
+        assert instance is None
+
+    @pytest.mark.asyncio
+    async def test_get_world(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={
+            "id": "wrld_001", "name": "TestWorld", "authorName": "Author", "authorId": "usr_author"
+        })):
+            world = await client.get_world("wrld_001")
+
+        assert world is not None
+        assert world.id == "wrld_001"
+        assert world.name == "TestWorld"
+
+    @pytest.mark.asyncio
+    async def test_get_world_404(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 404
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("404", request=Mock(), response=mock_resp)
+        )):
+            world = await client.get_world("nonexistent")
+
+        assert world is None
+
+    @pytest.mark.asyncio
+    async def test_get_user(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={
+            "id": "usr_target", "displayName": "TargetUser", "username": "target"
+        })):
+            user = await client.get_user("usr_target")
+
+        assert user is not None
+        assert user.id == "usr_target"
+        assert user.displayName == "TargetUser"
+
+    @pytest.mark.asyncio
+    async def test_get_user_404(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 404
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("404", request=Mock(), response=mock_resp)
+        )):
+            user = await client.get_user("nonexistent")
+
+        assert user is None
+
+    @pytest.mark.asyncio
+    async def test_get_group_members(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value=[
+            {"id": "mem_001", "groupId": "grp_001", "userId": "usr_001", "roleIds": ["role_001"]},
+            {"id": "mem_002", "groupId": "grp_001", "userId": "usr_002", "roleIds": []},
+        ])):
+            members = await client.get_group_members("grp_001")
+
+        assert len(members) == 2
+        assert members[0].userId == "usr_001"
+
+    @pytest.mark.asyncio
+    async def test_get_friends(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value=[
+            {"id": "usr_friend_1", "displayName": "Friend1"},
+            {"id": "usr_friend_2", "displayName": "Friend2"},
+        ])):
+            friends = await client.get_friends()
+
+        assert len(friends) == 2
+        assert friends[0]["displayName"] == "Friend1"
+
+    @pytest.mark.asyncio
+    async def test_get_friends_empty(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={})):
+            friends = await client.get_friends()
+
+        assert friends == []
+
+    @pytest.mark.asyncio
+    async def test_join_instance(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock()):
+            result = await client.join_instance("wrld_001:12345~public")
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_leave_instance(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock()):
+            result = await client.leave_instance("wrld_001:12345~public")
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_send_friend_request(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={"status": "pending"})):
+            result = await client.send_friend_request("usr_target")
+
+        assert result == {"status": "pending"}
+
+    @pytest.mark.asyncio
+    async def test_check_friend_status(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock(return_value={"isFriend": True})):
+            result = await client.check_friend_status("usr_target")
+
+        assert result == {"isFriend": True}
+
+    @pytest.mark.asyncio
+    async def test_refresh_auth(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        with patch.object(client, "_request", AsyncMock()):
+            result = await client.refresh_auth()
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_refresh_auth_fail(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_resp = Mock()
+        mock_resp.status_code = 401
+        with patch.object(client, "_request", AsyncMock(
+            side_effect=httpx.HTTPStatusError("401", request=Mock(), response=mock_resp)
+        )):
+            result = await client.refresh_auth()
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_close(self, app: App):
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="cookie")
+        client = VRCClient(config)
+
+        mock_http = AsyncMock()
+        client.client = mock_http
+
+        await client.close()
+
+        mock_http.aclose.assert_called_once()
+        assert client.client is None
+
+
+class TestEnsureVrcAuth:
+    @pytest.mark.asyncio
+    async def test_no_cookie(self, app: App):
+        from unittest.mock import AsyncMock
+        from utils import ensure_vrc_auth
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test")
+        client = VRCClient(config)
+
+        matcher = AsyncMock()
+        await ensure_vrc_auth(matcher, client)
+
+        matcher.finish.assert_called_once()
+        assert "尚未登录" in matcher.finish.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_has_cookie(self, app: App):
+        from unittest.mock import AsyncMock
+        from utils import ensure_vrc_auth
+        from utils.VRC.vrc_client import VRCClient
+        from utils.VRC.vrc_config import VRCConfig
+
+        bot, ctx = await create_mock_bot(app)
+        config = VRCConfig(username="test", auth_cookie="valid_cookie")
+        client = VRCClient(config)
+
+        matcher = AsyncMock()
+        await ensure_vrc_auth(matcher, client)
+
+        matcher.finish.assert_not_called()

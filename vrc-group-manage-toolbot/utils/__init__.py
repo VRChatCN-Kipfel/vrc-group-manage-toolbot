@@ -29,4 +29,5 @@ __all__ = [
     "GroupMember", "GroupRole", "Announcement", "JoinRequest", "AuditLogEntry",
     "get_vrc_client",
     "check_vrc_auth",
+    "ensure_vrc_auth",
 ]

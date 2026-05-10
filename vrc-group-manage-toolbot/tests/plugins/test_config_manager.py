@@ -4,6 +4,7 @@
 测试配置管理命令的存在性和基本结构
 """
 import pytest
+from unittest.mock import Mock
 from nonebug import App
 from tests import create_mock_bot
 
@@ -101,3 +102,81 @@ class TestConfigManagerCommands:
         # 验证可以使用
         assert hasattr(PermissionLevel, 'SUPERUSER')
         assert hasattr(PermissionLevel, 'OWNER')
+
+
+class TestExtractAtQQ:
+    def _make_event(self, raw_message: str, segments=None):
+        from nonebot.adapters.onebot.v11 import Message, MessageSegment
+
+        event = Mock()
+        event.raw_message = raw_message
+
+        if segments is not None:
+            event.get_message.return_value = Message(segments)
+        else:
+            event.get_message.return_value = Message(raw_message)
+
+        return event
+
+    @pytest.mark.asyncio
+    async def test_cq_format(self, app: App):
+        from plugins.config_manager import _extract_at_qq
+
+        bot, ctx = await create_mock_bot(app)
+        event = self._make_event(
+            "#bot settemppermission [CQ:at,qq=123456] 3"
+        )
+
+        result = _extract_at_qq(event)
+        assert result == "123456"
+
+    @pytest.mark.asyncio
+    async def test_napcat_format(self, app: App):
+        from plugins.config_manager import _extract_at_qq
+
+        bot, ctx = await create_mock_bot(app)
+        event = self._make_event(
+            "#bot settemppermission [at:qq=789012] 3"
+        )
+
+        result = _extract_at_qq(event)
+        assert result == "789012"
+
+    @pytest.mark.asyncio
+    async def test_segment_fallback(self, app: App):
+        from plugins.config_manager import _extract_at_qq
+        from nonebot.adapters.onebot.v11 import MessageSegment
+
+        bot, ctx = await create_mock_bot(app)
+        at_seg = MessageSegment.at("111222")
+        event = self._make_event(
+            "#bot settemppermission @someone 3",
+            segments=[at_seg]
+        )
+
+        result = _extract_at_qq(event)
+        assert result == "111222"
+
+    @pytest.mark.asyncio
+    async def test_at_all_ignored(self, app: App):
+        from plugins.config_manager import _extract_at_qq
+
+        bot, ctx = await create_mock_bot(app)
+        event = self._make_event(
+            "[CQ:at,qq=all] test message"
+        )
+
+        result = _extract_at_qq(event)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_no_at(self, app: App):
+        from plugins.config_manager import _extract_at_qq
+
+        bot, ctx = await create_mock_bot(app)
+        event = self._make_event(
+            "#bot status"
+        )
+
+        result = _extract_at_qq(event)
+        assert result is None

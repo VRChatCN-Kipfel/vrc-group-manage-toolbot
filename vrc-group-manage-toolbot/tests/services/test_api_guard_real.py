@@ -5,6 +5,8 @@ API 守卫服务测试 - 实测试
 """
 import asyncio
 import pytest
+import httpx
+from unittest.mock import Mock, AsyncMock, patch
 from nonebug import App
 from tests import create_mock_bot
 
@@ -204,3 +206,184 @@ class TestApiGuardReal:
         # 验证可以使用
         stats = api_guard.get_stats()
         assert isinstance(stats, dict)
+
+
+def _make_http_error(status: int, json_body: dict | None = None):
+    resp = Mock()
+    resp.status_code = status
+    resp.json.return_value = json_body or {}
+    return httpx.HTTPStatusError(f"{status} error", request=Mock(), response=resp)
+
+
+class TestApiGuardHttpErrors:
+    @pytest.mark.asyncio
+    async def test_call_with_429_retry(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=2)
+
+        async def mock_api():
+            raise _make_http_error(429)
+
+        with patch("asyncio.sleep", AsyncMock()):
+            success, result, error = await guard.call_with_retry(
+                mock_api, _endpoint="test_429"
+            )
+
+        assert success is False
+        assert result is None
+        assert "VRChat服务器繁忙" in error
+
+    @pytest.mark.asyncio
+    async def test_call_with_429_retry_success(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=2)
+        call_count = [0]
+
+        async def mock_api():
+            call_count[0] += 1
+            if call_count[0] < 2:
+                raise _make_http_error(429)
+            return {"ok": True}
+
+        with patch("asyncio.sleep", AsyncMock()):
+            success, result, error = await guard.call_with_retry(
+                mock_api, _endpoint="test_429"
+            )
+
+        assert success is True
+        assert result == {"ok": True}
+        assert error is None
+        assert call_count[0] >= 2
+
+    @pytest.mark.asyncio
+    async def test_call_with_401(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise _make_http_error(401)
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_401"
+        )
+
+        assert success is False
+        assert result is None
+        assert "尚未登录" in error
+
+    @pytest.mark.asyncio
+    async def test_call_with_403(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise _make_http_error(403)
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_403"
+        )
+
+        assert success is False
+        assert result is None
+        assert "权限" in error
+
+    @pytest.mark.asyncio
+    async def test_call_with_404(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise _make_http_error(404)
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_404"
+        )
+
+        assert success is False
+        assert result is None
+        assert "找不到" in error
+
+    @pytest.mark.asyncio
+    async def test_call_with_400(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise _make_http_error(400, {"error": {"message": "groupId is required"}})
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_400"
+        )
+
+        assert success is False
+        assert result is None
+        assert "参数不正确" in error
+        assert "groupId is required" in error
+
+    @pytest.mark.asyncio
+    async def test_call_with_400_no_detail(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise _make_http_error(400)
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_400"
+        )
+
+        assert success is False
+        assert result is None
+        assert error == "参数不正确"
+
+    @pytest.mark.asyncio
+    async def test_call_with_500(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=0)
+
+        async def mock_api():
+            raise _make_http_error(500)
+
+        success, result, error = await guard.call_with_retry(
+            mock_api, _endpoint="test_500"
+        )
+
+        assert success is False
+        assert result is None
+        assert "API错误" in error
+        assert "500" in error
+
+    @pytest.mark.asyncio
+    async def test_call_with_network_error_exhausted(self, app: App):
+        from services.api_guard import ApiGuard
+
+        bot, ctx = await create_mock_bot(app)
+        guard = ApiGuard(min_interval=0, max_retries=2)
+
+        async def mock_api():
+            raise httpx.RequestError("Connection timeout")
+
+        with patch("asyncio.sleep", AsyncMock()):
+            success, result, error = await guard.call_with_retry(
+                mock_api, _endpoint="test_network"
+            )
+
+        assert success is False
+        assert result is None
+        assert "网络异常" in error

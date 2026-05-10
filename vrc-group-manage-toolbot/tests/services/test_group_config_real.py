@@ -121,3 +121,111 @@ class TestGroupConfigReal:
         # 清理
         config.commands.clear()
         group_config_store.set(config)
+
+
+class TestGroupConfigReverseLookup:
+    @pytest.mark.asyncio
+    async def test_single_bind(self, app: App, cleanup_after_test):
+        from services.group_config import group_config_store
+
+        bot, ctx = await create_mock_bot(app)
+        group_id = get_test_group_id(50)
+        vrc_group_id = "grp_vrc_50"
+
+        config = group_config_store.get(group_id)
+        config.default_vrc_group = vrc_group_id
+        group_config_store.set(config)
+
+        found = group_config_store.get_by_vrc_group(vrc_group_id)
+        assert group_id in found
+
+        config.commands.clear()
+        config.default_vrc_group = None
+        group_config_store.set(config)
+
+    @pytest.mark.asyncio
+    async def test_multi_bind_same_vrc(self, app: App, cleanup_after_test):
+        from services.group_config import group_config_store
+
+        bot, ctx = await create_mock_bot(app)
+        group_id_1 = get_test_group_id(51)
+        group_id_2 = get_test_group_id(52)
+        vrc_group_id = "grp_vrc_51_52"
+
+        config1 = group_config_store.get(group_id_1)
+        config1.default_vrc_group = vrc_group_id
+        group_config_store.set(config1)
+
+        config2 = group_config_store.get(group_id_2)
+        config2.default_vrc_group = vrc_group_id
+        group_config_store.set(config2)
+
+        found = group_config_store.get_by_vrc_group(vrc_group_id)
+        assert group_id_1 in found
+        assert group_id_2 in found
+
+        config1.commands.clear()
+        config1.default_vrc_group = None
+        group_config_store.set(config1)
+        config2.commands.clear()
+        config2.default_vrc_group = None
+        group_config_store.set(config2)
+
+    @pytest.mark.asyncio
+    async def test_unbind_and_empty(self, app: App, cleanup_after_test):
+        from services.group_config import group_config_store
+
+        bot, ctx = await create_mock_bot(app)
+        group_id = get_test_group_id(53)
+        vrc_group_id = "grp_vrc_53"
+
+        config = group_config_store.get(group_id)
+        config.default_vrc_group = vrc_group_id
+        group_config_store.set(config)
+
+        config.default_vrc_group = None
+        group_config_store.set(config)
+
+        found = group_config_store.get_by_vrc_group(vrc_group_id)
+        assert found == []
+
+        not_found = group_config_store.get_by_vrc_group("nonexistent_grp")
+        assert not_found == []
+
+        config.commands.clear()
+        group_config_store.set(config)
+
+
+class TestCommandConfigValidation:
+    @pytest.mark.parametrize("perm_value", [0, 1, 2, 3, 4, 5])
+    @pytest.mark.asyncio
+    async def test_valid_range(self, app: App, perm_value):
+        from services.group_config import CommandConfig
+
+        bot, ctx = await create_mock_bot(app)
+        cmd = CommandConfig(enabled=True, permission=perm_value)
+        assert cmd.permission == perm_value
+        assert cmd.get_permission_level() == perm_value
+
+    @pytest.mark.parametrize("perm_value", [-1, 6, 100])
+    @pytest.mark.asyncio
+    async def test_invalid_range(self, app: App, perm_value):
+        from pydantic import ValidationError
+        from services.group_config import CommandConfig
+
+        bot, ctx = await create_mock_bot(app)
+        with pytest.raises(ValidationError):
+            CommandConfig(enabled=True, permission=perm_value)
+
+    @pytest.mark.parametrize("input_val,expected", [
+        ("true", True),
+        ("false", False),
+    ])
+    @pytest.mark.asyncio
+    async def test_bool_string(self, app: App, input_val, expected):
+        from services.group_config import CommandConfig
+
+        bot, ctx = await create_mock_bot(app)
+
+        cmd = CommandConfig.model_validate({"enabled": input_val, "permission": 0})
+        assert cmd.enabled is expected

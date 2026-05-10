@@ -205,3 +205,73 @@ class TestUserBindingReal:
         # 验证可以使用
         result = user_binding_store.get_by_qq("test")
         assert result is None or hasattr(result, 'qq_id')
+
+
+class TestBindingReverseLookup:
+    @pytest.mark.asyncio
+    async def test_get_by_vrc_found(self, app: App, cleanup_user_after_test):
+        from services.user_binding import user_binding_store, BindingRecord
+        import time
+
+        bot, ctx = await create_mock_bot(app)
+        test_user_id = get_test_user_id(20)
+        vrc_user_id = "usr_reverse_20"
+
+        binding = BindingRecord(
+            qq_id=test_user_id,
+            vrc_user_id=vrc_user_id,
+            vrc_display_name="ReverseUser",
+            bound_at=time.time(),
+            confirmed=True,
+        )
+        user_binding_store.set(binding)
+
+        found = user_binding_store.get_by_vrc(vrc_user_id)
+        assert found is not None
+        assert found.vrc_user_id == vrc_user_id
+        assert found.qq_id == test_user_id
+
+    @pytest.mark.asyncio
+    async def test_get_by_vrc_not_found(self, app: App):
+        from services.user_binding import user_binding_store
+
+        bot, ctx = await create_mock_bot(app)
+        result = user_binding_store.get_by_vrc("usr_nonexistent_xyz")
+        assert result is None
+
+
+class TestBindingVerifyDefaults:
+    @pytest.mark.asyncio
+    async def test_default_confirmed_false(self, app: App):
+        from services.user_binding import BindingRecord
+        import time
+
+        bot, ctx = await create_mock_bot(app)
+
+        binding = BindingRecord(
+            qq_id="1000000001",
+            vrc_user_id="usr_default",
+            vrc_display_name="DefaultUser",
+            bound_at=time.time(),
+        )
+
+        assert binding.confirmed is False
+        assert binding.verify_code is None
+        assert binding.verify_code_expires is None
+
+    @pytest.mark.asyncio
+    async def test_default_verify_code_none(self, app: App):
+        from services.user_binding import BindingRecord
+        import time
+
+        bot, ctx = await create_mock_bot(app)
+
+        binding = BindingRecord(
+            qq_id="1000000002",
+            vrc_user_id="usr_default2",
+            vrc_display_name="DefaultUser2",
+            bound_at=time.time(),
+        )
+
+        assert binding.verify_code is None
+        assert binding.verify_code_expires is None
