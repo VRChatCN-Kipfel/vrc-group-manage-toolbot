@@ -11,6 +11,7 @@
 | 用户绑定 | 5 | QQ↔VRChat 账号绑定与查询 |
 | 群组绑定 | 1 | QQ 群与 VRChat 群组绑定管理 |
 | 系统 | 3 | 登录、两步验证、Cookie 直登 |
+| HTML渲染 | 3 | 文本/Markdown转图片、卡片生成 |
 
 ---
 
@@ -19,7 +20,7 @@
 ### 1. 安装依赖
 
 ```bash
-pip install nonebot2[aiohttp,fastapi,httpx,websockets] nonebot-adapter-onebot nonebot-plugin-localstore
+pip install nonebot2[aiohttp,fastapi,httpx,websockets] nonebot-adapter-onebot nonebot-plugin-localstore nonebot-plugin-htmlkit
 ```
 
 ### 2. 配置环境变量
@@ -147,6 +148,16 @@ python run.py
 
 详细文档请查看 [CONFIG_GUIDE.md](./CONFIG_GUIDE.md)
 
+### 🎨 HTML 渲染功能（示例）
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `#htmldemo [类型]` | `#htmldemo text/md/card/dark` | HTML 渲染演示 |
+| `#groupstatus` | 直接发送 | 显示群组状态卡片 |
+| `#htmlhelp` | 直接发送 | 显示帮助信息 |
+
+详细文档请查看 [HTML_RENDER_GUIDE.md](./docs/HTML_RENDER_GUIDE.md)
+
 ---
 
 ## 项目结构
@@ -164,20 +175,26 @@ vrc-group-manage-toolbot/
 │   ├── group_admin.py      # 群管理命令（12个）
 │   ├── user_bind.py        # 用户绑定命令（5个）
 │   ├── config_manager.py   # 配置管理
-│   └── group_bind.py       # 群组绑定命令
+│   ├── group_bind.py       # 群组绑定命令
+│   └── html_render_demo.py # HTML 渲染示例插件
 │
 ├── services/               # 服务层（插件 ↔ 后端）
 │   ├── api_guard.py        # 速率控制 + 指数退避 + 缓存
 │   ├── permission.py       # 六级权限判断
 │   ├── message_utils.py    # 消息格式化/分段
 │   ├── user_binding.py     # 绑定数据持久化
-│   └── group_config.py     # 每群独立配置
+│   ├── group_config.py     # 每群独立配置
+│   └── html_render.py      # HTML 渲染服务
 │
 ├── utils/                  # 后端
 │   └── VRC/
 │       ├── vrc_client.py   # VRChat API HTTP 客户端
 │       ├── vrc_config.py   # 配置模型
 │       └── vrc_models.py   # Pydantic 数据模型
+│
+├── docs/                   # 文档目录
+│   ├── HTML_RENDER_GUIDE.md      # HTML 渲染使用指南
+│   └── HTML_RENDER_EXAMPLES.md   # HTML 渲染使用示例
 │
 └── data/                   # 运行时数据（不提交）
     ├── bindings.json

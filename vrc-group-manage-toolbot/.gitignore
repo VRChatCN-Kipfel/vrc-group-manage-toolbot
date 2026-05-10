@@ -4,3 +4,7 @@ data/
 __pycache__/
 *.pyc
 .env.prod
+
+# HTML 渲染测试文件
+test_output_*.png
+cache/
