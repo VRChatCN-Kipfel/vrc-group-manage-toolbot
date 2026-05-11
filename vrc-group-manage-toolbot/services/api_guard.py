@@ -63,7 +63,7 @@ class ApiGuard:
                     if attempt < self.max_retries:
                         wait = (2 ** attempt) * 2
                         logger.warning(
-                            f"Rate limited ({endpoint}), retrying in {wait}s "
+                            f"触发限流 ({endpoint})，{wait}秒后重试 "
                             f"(attempt {attempt + 1}/{self.max_retries})"
                         )
                         await asyncio.sleep(wait)
