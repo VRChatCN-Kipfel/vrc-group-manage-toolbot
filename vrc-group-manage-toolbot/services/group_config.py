@@ -112,7 +112,7 @@ class GroupConfigStore:
                     k: GroupConfig(**v) for k, v in data.items()
                 }
             except (json.JSONDecodeError, Exception) as e:
-                logger.error(f"Failed to load group configs, resetting: {e}")
+                logger.error(f"群组配置加载失败，已重置: {e}")
                 self._configs = {}
 
     def _save(self):

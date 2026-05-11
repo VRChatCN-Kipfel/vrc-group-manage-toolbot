@@ -31,7 +31,7 @@ class UserBindingStore:
                     k: BindingRecord(**v) for k, v in data.items()
                 }
             except (json.JSONDecodeError, Exception) as e:
-                logger.error(f"Failed to load bindings, resetting: {e}")
+                logger.error(f"用户绑定数据加载失败，已重置: {e}")
                 self._bindings = {}
 
     def _save(self):

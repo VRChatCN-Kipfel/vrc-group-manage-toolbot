@@ -119,7 +119,7 @@ async def check_vrc_group_role(
                 return True
         return False
     except Exception as e:
-        logger.warning(f"check_vrc_group_role failed: {e}")
+        logger.warning(f"VRC群角色检查失败: {e}")
         return False
 
 
