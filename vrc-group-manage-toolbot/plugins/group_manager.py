@@ -205,7 +205,7 @@ async def handle_vrc_login(bot: Bot, event: MessageEvent, args: Message = Comman
             client.config.auth_cookie = cookie
             client.client = None
             client._authenticated = False
-            logger.info(f"Trying cookie login, cookie len={len(cookie)}")
+            logger.info(f"正在尝试 Cookie 登录，长度={len(cookie)}")
             user = await client.get_current_user()
         except Exception as e:
             logger.error(f"Cookie 验证异常: {e}")

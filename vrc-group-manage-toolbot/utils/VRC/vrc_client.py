@@ -40,14 +40,14 @@ class VRCClient:
         if self.config.auth_cookie:
             self._cookie_file.parent.mkdir(parents=True, exist_ok=True)
             self._cookie_file.write_text(self.config.auth_cookie)
-            logger.debug(f"Auth cookie saved to {self._cookie_file}")
+            logger.debug(f"认证 Cookie 已保存至 {self._cookie_file}")
     
     def _load_cookie(self):
         if not self.config.auth_cookie and self._cookie_file.exists():
             saved = self._cookie_file.read_text().strip()
             if saved:
                 self.config.auth_cookie = saved
-                logger.info("Loaded saved auth cookie")
+                logger.info("已加载保存的认证 Cookie")
         
     async def _get_client(self) -> httpx.AsyncClient:
         """获取 HTTP 客户端"""
@@ -61,9 +61,9 @@ class VRCClient:
             # 如果有认证 cookie，添加到请求头
             if self.config.auth_cookie:
                 headers["Cookie"] = f"auth={self.config.auth_cookie}"
-                logger.info(f"Auth cookie loaded (len={len(self.config.auth_cookie)})")
+                logger.info(f"认证 Cookie 已加载 (长度={len(self.config.auth_cookie)})")
             else:
-                logger.debug("No auth cookie set")
+                logger.debug("未设置认证 Cookie")
             
             self.client = httpx.AsyncClient(
                 base_url=self.config.base_url,
@@ -95,7 +95,7 @@ class VRCClient:
             if not user or not pwd:
                 return False
             client = await self._get_client()
-            logger.info(f"Submitting 2FA code: {tfa_code}")
+            logger.info(f"正在提交两步验证码: {tfa_code}")
             # 构建请求参数：BasicAuth + twoFactorAuth cookie
             kwargs = {"json": {"code": tfa_code}}
             cookie_key = str(user_id) if user_id else "_default"
@@ -108,24 +108,24 @@ class VRCClient:
                 "/auth/twofactorauth/totp/verify",
                 **kwargs,
             )
-            logger.info(f"2FA verify status: {tfa_response.status_code}")
+            logger.info(f"两步验证状态: {tfa_response.status_code}")
             if tfa_response.status_code == 429:
-                logger.warning("2FA verify 429 rate limited, waiting 5s and retrying...")
+                logger.warning("两步验证触发429限流，等待5秒后重试...")
                 await asyncio.sleep(5)
                 tfa_response = await client.post(
                     "/auth/twofactorauth/totp/verify",
                     **kwargs,
                 )
-                logger.info(f"2FA verify retry status: {tfa_response.status_code}")
+                logger.info(f"两步验证重试状态: {tfa_response.status_code}")
             if tfa_response.status_code != 200:
-                logger.error(f"2FA verify non-200: {tfa_response.text[:200]}")
+                logger.error(f"两步验证返回非200状态: {tfa_response.text[:200]}")
                 return False
             self._pending_2fa_cookies.pop(cookie_key, None)
             twofa_cookie = tfa_response.cookies.get("twoFactorAuth")
             if not twofa_cookie:
-                logger.error(f"No twoFactorAuth, cookies: {dict(tfa_response.cookies)}")
+                logger.error(f"未获取到 twoFactorAuth Cookie: {dict(tfa_response.cookies)}")
                 return False
-            logger.info(f"2FA verify passed, getting final auth cookie...")
+            logger.info(f"两步验证通过，正在获取最终认证 Cookie...")
             final_client = httpx.AsyncClient(
                 base_url=self.config.base_url,
                 auth=httpx.BasicAuth(user, pwd),
@@ -137,7 +137,7 @@ class VRCClient:
             )
             try:
                 final_response = await final_client.get("/auth/user")
-                logger.info(f"Final auth: {final_response.status_code}, "
+                logger.info(f"最终认证状态: {final_response.status_code}, "
                            f"cookies={list(dict(final_response.cookies).keys())}")
                 if final_response.status_code == 200:
                     final_cookie = final_response.cookies.get("auth")
@@ -149,14 +149,14 @@ class VRCClient:
                         self._save_cookie()
                         return True
                     else:
-                        logger.error(f"No auth cookie: {dict(final_response.cookies)}")
+                        logger.error(f"未获取到认证 Cookie: {dict(final_response.cookies)}")
                 else:
-                    logger.error(f"Final auth failed: {final_response.status_code}")
+                    logger.error(f"最终认证失败: {final_response.status_code}")
             finally:
                 await final_client.aclose()
             return False
         except Exception as e:
-            logger.error(f"2FA exception: {e}")
+            logger.error(f"两步验证异常: {e}")
             return False
 
     async def login(self, username: Optional[str] = None, password: Optional[str] = None, user_id: str = None):
@@ -200,9 +200,9 @@ class VRCClient:
                             self._pending_2fa_cookies[str(user_id)] = twofa_cookie
                         else:
                             self._pending_2fa_cookies["_default"] = twofa_cookie
-                        logger.info("需要两步验证码，已保存 twoFactorAuth cookie")
+                        logger.info("需要两步验证码，已保存两步验证 Cookie")
                     else:
-                        logger.warning("需要两步验证但未收到 twoFactorAuth cookie")
+                        logger.warning("需要两步验证但未收到两步验证 Cookie")
                     return "need_2fa"
                 else:
                     # 不需要两步验证
