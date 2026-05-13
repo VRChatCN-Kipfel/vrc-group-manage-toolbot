@@ -30,7 +30,8 @@
 - ✅ 支持一次性定时任务（Date）
 - ✅ 提供完整的任务管理功能（查看、暂停、恢复、删除、修改）
 - ✅ 自动日志记录
-- ✅ 任务 ID 唯一性管理
+- ✅ 任务 ID 唯一性保护（防止意外覆盖）
+- ✅ 强制覆盖机制（显式控制）
 
 ## 基本用法
 
@@ -67,6 +68,9 @@ scheduler_service.add_interval_task(
 - `minutes`: 间隔分钟数
 - `hours`: 间隔小时数
 - `task_id`: 任务唯一标识符（可选，默认为函数名）
+- `force_replace`: 是否强制覆盖已存在的任务（默认 `False`）
+
+> ⚠️ **注意**：如果任务 ID 已存在且未设置 `force_replace=True`，将抛出 `TaskAlreadyExistsError` 异常。
 
 #### 更多示例
 
@@ -77,6 +81,17 @@ scheduler_service.add_interval_task(
     minutes=5,
     task_id="check_api_status"
 )
+
+# 如果任务已存在，强制覆盖
+try:
+    scheduler_service.add_interval_task(
+        func=my_function,
+        minutes=5,
+        task_id="check_api_status",
+        force_replace=True  # 明确表达覆盖意图
+    )
+except TaskAlreadyExistsError:
+    logger.warning("任务已存在，请先移除或选择其他ID")
 
 # 每小时执行一次
 scheduler_service.add_interval_task(
@@ -114,7 +129,14 @@ scheduler_service.add_cron_task(
 )
 ```
 
-#### Cron 表达式格式
+#### 参数说明
+
+- `func`: 要执行的异步函数
+- `cron_expr`: Cron 表达式（5字段格式：分 时 日 月 星期）
+- `task_id`: 任务唯一标识符（可选，默认为函数名）
+- `force_replace`: 是否强制覆盖已存在的任务（默认 `False`）
+
+> ⚠️ **注意**：如果任务 ID 已存在且未设置 `force_replace=True`，将抛出 `TaskAlreadyExistsError` 异常。
 
 Cron 表达式由 5 个字段组成，用空格分隔：
 
@@ -196,6 +218,9 @@ scheduler_service.add_date_task(
 - `func`: 要执行的异步函数
 - `run_date`: 执行时间（datetime 对象）
 - `task_id`: 任务唯一标识符（可选，默认为函数名）
+- `force_replace`: 是否强制覆盖已存在的任务（默认 `False`）
+
+> ⚠️ **注意**：如果任务 ID 已存在且未设置 `force_replace=True`，将抛出 `TaskAlreadyExistsError` 异常。
 
 #### 更多示例
 
@@ -460,11 +485,60 @@ scheduler_service.add_interval_task(
     task_id="api_health_check"
 )
 
-# ❌ 避免使用默认 ID
+# ❌ 避免使用默认 ID（可能导致冲突）
 scheduler_service.add_interval_task(
     func=check_api_health,
     minutes=5
 )
+```
+
+### 2.5. 处理任务已存在的情况
+
+当注册任务时，如果任务 ID 已存在，会抛出 `TaskAlreadyExistsError` 异常。你可以根据业务需求选择处理方式：
+
+#### 方式1：捕获异常并提示用户
+
+```python
+from services.scheduler_service import TaskAlreadyExistsError
+
+try:
+    scheduler_service.add_interval_task(
+        func=my_task,
+        minutes=5,
+        task_id="my_task"
+    )
+except TaskAlreadyExistsError as e:
+    logger.warning(f"任务已存在: {e}")
+    # 可以选择移除旧任务或使用其他ID
+```
+
+#### 方式2：强制覆盖（谨慎使用）
+
+```python
+# 仅在确定需要覆盖时使用
+scheduler_service.add_interval_task(
+    func=my_task,
+    minutes=5,
+    task_id="my_task",
+    force_replace=True  # 明确表达覆盖意图
+)
+```
+
+#### 方式3：先检查再注册
+
+```python
+# 先检查任务是否存在
+existing_job = scheduler_service.get_all_jobs()
+task_exists = any(job.id == "my_task" for job in existing_job)
+
+if not task_exists:
+    scheduler_service.add_interval_task(
+        func=my_task,
+        minutes=5,
+        task_id="my_task"
+    )
+else:
+    logger.info("任务已存在，跳过注册")
 ```
 
 ### 3. 添加错误处理
@@ -605,6 +679,40 @@ async def handle_add_task(bot: Bot, event: MessageEvent):
 
 # ✅ 正确
 "30 2 * * *"
+```
+
+### Q7: 如何处理任务 ID 冲突？
+
+当注册任务时，如果任务 ID 已存在，会抛出 `TaskAlreadyExistsError` 异常。有三种处理方式：
+
+**方式1：捕获异常**
+
+```python
+from services.scheduler_service import TaskAlreadyExistsError
+
+try:
+    scheduler_service.add_interval_task(func, minutes=5, task_id="my_task")
+except TaskAlreadyExistsError:
+    logger.warning("任务已存在，请先移除或使用其他ID")
+```
+
+**方式2：强制覆盖（谨慎使用）**
+
+```python
+scheduler_service.add_interval_task(
+    func, 
+    minutes=5, 
+    task_id="my_task",
+    force_replace=True
+)
+```
+
+**方式3：先检查再注册**
+
+```python
+jobs = scheduler_service.get_all_jobs()
+if not any(job.id == "my_task" for job in jobs):
+    scheduler_service.add_interval_task(func, minutes=5, task_id="my_task")
 ```
 
 ## 完整示例

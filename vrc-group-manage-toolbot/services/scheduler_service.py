@@ -11,6 +11,14 @@ from nonebot.log import logger
 from nonebot_plugin_apscheduler import scheduler as default_scheduler
 
 
+class TaskAlreadyExistsError(Exception):
+    """任务已存在异常"""
+    def __init__(self, task_id: str, message: str = None):
+        self.task_id = task_id
+        self.message = message or f"任务 '{task_id}' 已存在"
+        super().__init__(self.message)
+
+
 class SchedulerService:
     """调度服务包装类"""
 
@@ -30,39 +38,88 @@ class SchedulerService:
         minutes: int = 0,
         hours: int = 0,
         task_id: str = None,
+        force_replace: bool = False,
         **kwargs
     ):
-        """添加周期性间隔任务"""
+        """添加周期性间隔任务
+        
+        Args:
+            func: 要执行的异步函数
+            seconds: 间隔秒数
+            minutes: 间隔分钟数
+            hours: 间隔小时数
+            task_id: 任务唯一标识符（可选，默认为函数名）
+            force_replace: 是否强制覆盖已存在的任务（默认 False）
+            
+        Raises:
+            TaskAlreadyExistsError: 当任务已存在且未设置 force_replace 时抛出
+        """
+        task_id = task_id or func.__name__
+        
+        # 检查任务是否已存在
+        existing_job = self.scheduler.get_job(task_id)
+        if existing_job:
+            if not force_replace:
+                logger.warning(f"任务 {task_id} 已存在，拒绝注册（如需覆盖请设置 force_replace=True）")
+                raise TaskAlreadyExistsError(task_id)
+            else:
+                logger.info(f"任务 {task_id} 已存在，将强制覆盖")
+        
         trigger = IntervalTrigger(seconds=seconds, minutes=minutes, hours=hours)
         self.scheduler.add_job(
             func,
             trigger=trigger,
-            id=task_id or func.__name__,
+            id=task_id,
             replace_existing=True,
             **kwargs
         )
-        logger.info(f"已注册间隔任务: {task_id or func.__name__} (每 {seconds}s {minutes}m {hours}h)")
+        logger.info(f"已注册间隔任务: {task_id} (每 {seconds}s {minutes}m {hours}h)")
 
     def add_cron_task(
         self,
         func,
         cron_expr: str,
         task_id: str = None,
+        force_replace: bool = False,
         **kwargs
     ):
-        """添加 Cron 表达式任务"""
+        """添加 Cron 表达式任务
+        
+        Args:
+            func: 要执行的异步函数
+            cron_expr: Cron 表达式（5字段格式：分 时 日 月 星期）
+            task_id: 任务唯一标识符（可选，默认为函数名）
+            force_replace: 是否强制覆盖已存在的任务（默认 False）
+            
+        Raises:
+            TaskAlreadyExistsError: 当任务已存在且未设置 force_replace 时抛出
+        """
+        task_id = task_id or func.__name__
         try:
+            # 检查任务是否已存在
+            existing_job = self.scheduler.get_job(task_id)
+            if existing_job:
+                if not force_replace:
+                    logger.warning(f"任务 {task_id} 已存在，拒绝注册（如需覆盖请设置 force_replace=True）")
+                    raise TaskAlreadyExistsError(task_id)
+                else:
+                    logger.info(f"任务 {task_id} 已存在，将强制覆盖")
+            
             trigger = CronTrigger.from_crontab(cron_expr)
             self.scheduler.add_job(
                 func,
                 trigger=trigger,
-                id=task_id or func.__name__,
+                id=task_id,
                 replace_existing=True,
                 **kwargs
             )
-            logger.info(f"已注册 Cron 任务: {task_id or func.__name__} ({cron_expr})")
+            logger.info(f"已注册 Cron 任务: {task_id} ({cron_expr})")
+        except TaskAlreadyExistsError:
+            # 继续向上抛出自定义的异常
+            raise
         except Exception as e:
             logger.error(f"Cron 表达式格式错误或注册失败: {cron_expr}, 错误: {e}")
+            raise
 
     def remove_task(self, task_id: str):
         """移除指定任务
@@ -135,17 +192,38 @@ class SchedulerService:
             logger.warning(f"任务不存在: {task_id}")
             raise
 
-    def add_date_task(self, func, run_date, task_id: str = None, **kwargs):
-        """添加一次性定时任务"""
+    def add_date_task(self, func, run_date, task_id: str = None, force_replace: bool = False, **kwargs):
+        """添加一次性定时任务
+        
+        Args:
+            func: 要执行的异步函数
+            run_date: 执行时间（datetime 对象）
+            task_id: 任务唯一标识符（可选，默认为函数名）
+            force_replace: 是否强制覆盖已存在的任务（默认 False）
+            
+        Raises:
+            TaskAlreadyExistsError: 当任务已存在且未设置 force_replace 时抛出
+        """
+        task_id = task_id or func.__name__
+        
+        # 检查任务是否已存在
+        existing_job = self.scheduler.get_job(task_id)
+        if existing_job:
+            if not force_replace:
+                logger.warning(f"任务 {task_id} 已存在，拒绝注册（如需覆盖请设置 force_replace=True）")
+                raise TaskAlreadyExistsError(task_id)
+            else:
+                logger.info(f"任务 {task_id} 已存在，将强制覆盖")
+        
         trigger = DateTrigger(run_date=run_date)
         self.scheduler.add_job(
             func,
             trigger=trigger,
-            id=task_id or func.__name__,
+            id=task_id,
             replace_existing=True,
             **kwargs
         )
-        logger.info(f"已注册一次性任务: {task_id or func.__name__} (运行时间: {run_date})")
+        logger.info(f"已注册一次性任务: {task_id} (运行时间: {run_date})")
 
     def is_scheduler_running(self):
         """检查调度器是否正在运行"""
