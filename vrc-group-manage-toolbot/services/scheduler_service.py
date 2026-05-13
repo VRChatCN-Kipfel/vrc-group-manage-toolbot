@@ -46,13 +46,8 @@ class SchedulerService:
         **kwargs
     ):
         """添加 Cron 表达式任务"""
-        # 简单的 Cron 解析，实际可根据需求扩展
-        parts = cron_expr.split()
-        if len(parts) == 5:
-            minute, hour, day, month, day_of_week = parts
-            trigger = CronTrigger(
-                minute=minute, hour=hour, day=day, month=month, day_of_week=day_of_week
-            )
+        try:
+            trigger = CronTrigger.from_crontab(cron_expr)
             scheduler.add_job(
                 func,
                 trigger=trigger,
@@ -61,8 +56,8 @@ class SchedulerService:
                 **kwargs
             )
             logger.info(f"已注册 Cron 任务: {task_id or func.__name__} ({cron_expr})")
-        else:
-            logger.error(f"Cron 表达式格式错误: {cron_expr}")
+        except Exception as e:
+            logger.error(f"Cron 表达式格式错误或注册失败: {cron_expr}, 错误: {e}")
 
     @staticmethod
     def remove_task(task_id: str):
