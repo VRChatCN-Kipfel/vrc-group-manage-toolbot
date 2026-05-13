@@ -85,12 +85,14 @@ class SchedulerService:
         """获取指定任务的详细信息"""
         job = self.scheduler.get_job(task_id)
         if job:
+            # 优先使用 func_ref（模块路径），否则使用函数名
+            func_name = job.func_ref or getattr(job.func, '__name__', repr(job.func))
             return {
                 'id': job.id,
                 'name': job.name,
                 'trigger': str(job.trigger),
                 'next_run_time': str(job.next_run_time),
-                'func': job.func_ref or str(job.func)
+                'func': func_name
             }
         return None
 
