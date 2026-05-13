@@ -6,6 +6,7 @@ from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.jobstores.base import JobLookupError
 from nonebot.log import logger
 from nonebot_plugin_apscheduler import scheduler as default_scheduler
 
@@ -64,12 +65,17 @@ class SchedulerService:
             logger.error(f"Cron 表达式格式错误或注册失败: {cron_expr}, 错误: {e}")
 
     def remove_task(self, task_id: str):
-        """移除指定任务"""
+        """移除指定任务
+        
+        Raises:
+            JobLookupError: 当任务不存在时抛出
+        """
         try:
             self.scheduler.remove_job(task_id)
             logger.info(f"已移除任务: {task_id}")
-        except Exception as e:
-            logger.warning(f"移除任务 {task_id} 失败: {e}")
+        except JobLookupError:
+            logger.warning(f"任务不存在: {task_id}")
+            raise
 
     def get_all_jobs(self):
         """获取所有当前运行的任务"""
@@ -89,28 +95,43 @@ class SchedulerService:
         return None
 
     def pause_task(self, task_id: str):
-        """暂停指定任务"""
+        """暂停指定任务
+        
+        Raises:
+            JobLookupError: 当任务不存在时抛出
+        """
         try:
             self.scheduler.pause_job(task_id)
             logger.info(f"已暂停任务: {task_id}")
-        except Exception as e:
-            logger.warning(f"暂停任务 {task_id} 失败: {e}")
+        except JobLookupError:
+            logger.warning(f"任务不存在: {task_id}")
+            raise
 
     def resume_task(self, task_id: str):
-        """恢复指定任务"""
+        """恢复指定任务
+        
+        Raises:
+            JobLookupError: 当任务不存在时抛出
+        """
         try:
             self.scheduler.resume_job(task_id)
             logger.info(f"已恢复任务: {task_id}")
-        except Exception as e:
-            logger.warning(f"恢复任务 {task_id} 失败: {e}")
+        except JobLookupError:
+            logger.warning(f"任务不存在: {task_id}")
+            raise
 
     def modify_task(self, task_id: str, **changes):
-        """修改任务参数"""
+        """修改任务参数
+        
+        Raises:
+            JobLookupError: 当任务不存在时抛出
+        """
         try:
             self.scheduler.modify_job(task_id, **changes)
             logger.info(f"已修改任务: {task_id}")
-        except Exception as e:
-            logger.warning(f"修改任务 {task_id} 失败: {e}")
+        except JobLookupError:
+            logger.warning(f"任务不存在: {task_id}")
+            raise
 
     def add_date_task(self, func, run_date, task_id: str = None, **kwargs):
         """添加一次性定时任务"""
