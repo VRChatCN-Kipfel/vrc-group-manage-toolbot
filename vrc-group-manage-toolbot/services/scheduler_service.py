@@ -2,12 +2,6 @@
 定时任务调度服务
 基于 nonebot-plugin-apscheduler 提供统一的调度接口
 """
-
-from nonebot import require
-
-# 加载 nonebot_plugin_apscheduler 插件
-require("nonebot_plugin_apscheduler")
-
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
