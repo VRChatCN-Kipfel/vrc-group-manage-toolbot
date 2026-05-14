@@ -5,16 +5,14 @@ HTML 渲染服务
 
 from typing import Optional, Union
 from pathlib import Path
-from nonebot import require, logger
-
-# 必须先 require 再 import
-require("nonebot_plugin_htmlkit")
+from nonebot import logger
 
 from nonebot_plugin_htmlkit import (
     text_to_pic,
     md_to_pic,
     template_to_pic,
     html_to_pic,
+    debug_html_to_pic
 )
 
 
