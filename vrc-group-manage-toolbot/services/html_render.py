@@ -150,27 +150,69 @@ class HTMLRenderService:
         title: str,
         content: str,
         footer: Optional[str] = None,
-        theme: str = "light",
+        theme: str = "miku",
         width: int = 800,
+        decorations: bool = True,
     ) -> bytes:
         """
         使用卡片模板渲染为图片
+        
+        Args:
+            title: 卡片标题
+            content: 卡片内容（HTML格式）
+            footer: 页脚信息（可选）
+            theme: 主题名称 ("miku", "light", "dark")
+            width: 图片宽度
+            decorations: 是否启用装饰线（渐变光带、下划线等）
         """
         try:
             # 主题配色逻辑保留在 Python 层，方便动态切换
             themes = {
+                "miku": {  # 初音未来主题（默认）
+                    "bg_color": "#08080c",                    # 深邃黑
+                    "card_bg": "rgba(10, 18, 30, 0.42)",     # 半透明深蓝
+                    "border_color": "rgba(57, 197, 187, 0.22)",  # 初音绿半透明
+                    "title_color": "#7fffd4",                # 薄荷绿
+                    "text_color": "#d0f0ee",                 # 浅青白
+                    "footer_color": "#5aaeb0",               # 青绿色
+                    # CSS 变量系统 - 强调色（使用默认值）
+                    "accent_1": "#7fffd4",                   # 薄荷绿
+                    "accent_2": "#39c5bb",                   # 初音绿
+                    "accent_3": "#40e0d0",                   # 湖水蓝
+                    "accent_1_rgb": "127, 255, 212",
+                    "accent_2_rgb": "57, 197, 187",
+                    "accent_3_rgb": "64, 224, 208",
+                },
                 "light": {
-                    "bg_color": "#ffffff", "card_bg": "#f8f9fa",
-                    "title_color": "#2c3e50", "text_color": "#333333",
-                    "footer_color": "#666666", "border_color": "#e0e0e0",
+                    "bg_color": "#ffffff", 
+                    "card_bg": "rgba(248, 249, 250, 0.9)",
+                    "border_color": "rgba(57, 197, 187, 0.3)",
+                    "title_color": "#2c3e50", 
+                    "text_color": "#333333",
+                    "footer_color": "#666666",
+                    "accent_1": "#7fffd4",
+                    "accent_2": "#39c5bb",
+                    "accent_3": "#40e0d0",
+                    "accent_1_rgb": "127, 255, 212",
+                    "accent_2_rgb": "57, 197, 187",
+                    "accent_3_rgb": "64, 224, 208",
                 },
                 "dark": {
-                    "bg_color": "#1a1a1a", "card_bg": "#2d2d2d",
-                    "title_color": "#ecf0f1", "text_color": "#bdc3c7",
-                    "footer_color": "#95a5a6", "border_color": "#404040",
+                    "bg_color": "#1a1a1a", 
+                    "card_bg": "rgba(45, 45, 45, 0.85)",
+                    "border_color": "rgba(57, 197, 187, 0.2)",
+                    "title_color": "#ecf0f1", 
+                    "text_color": "#bdc3c7",
+                    "footer_color": "#95a5a6",
+                    "accent_1": "#7fffd4",
+                    "accent_2": "#39c5bb",
+                    "accent_3": "#40e0d0",
+                    "accent_1_rgb": "127, 255, 212",
+                    "accent_2_rgb": "57, 197, 187",
+                    "accent_3_rgb": "64, 224, 208",
                 }
             }
-            colors = themes.get(theme, themes["light"])
+            colors = themes.get(theme, themes["miku"])
             
             css_template = await HTMLRenderService._read_css("card.css.j2")
             final_css = css_template.format(**colors)
@@ -182,7 +224,8 @@ class HTMLRenderService:
                     "title": title,
                     "content": content,
                     "footer": footer,
-                    "css": final_css
+                    "css": final_css,
+                    "decorations": decorations,
                 },
                 width=width,
                 base_url=f"file://{ASSETS_DIR.as_posix()}/"
