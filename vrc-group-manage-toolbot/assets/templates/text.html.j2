@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        {{ css | safe }}
+    </style>
+</head>
+<body>
+    <div class="content">
+        {{ text | replace("\n", "<br>") | safe }}
+    </div>
+</body>
+</html>

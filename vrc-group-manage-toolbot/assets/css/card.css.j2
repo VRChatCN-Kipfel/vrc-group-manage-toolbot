@@ -1,0 +1,36 @@
+body {
+    margin: 0;
+    padding: 20px;
+    background-color: {{ bg_color }};
+    font-family: "Microsoft YaHei", "SimHei", sans-serif;
+}
+.card {
+    background-color: {{ card_bg }};
+    border: 1px solid {{ border_color }};
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 760px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.title {
+    font-size: 24px;
+    font-weight: bold;
+    color: {{ title_color }};
+    margin-bottom: 15px;
+    border-bottom: 2px solid {{ border_color }};
+    padding-bottom: 10px;
+}
+.content {
+    font-size: 16px;
+    color: {{ text_color }};
+    line-height: 1.8;
+    margin-bottom: 15px;
+}
+.footer {
+    font-size: 14px;
+    color: {{ footer_color }};
+    text-align: right;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid {{ border_color }};
+}
