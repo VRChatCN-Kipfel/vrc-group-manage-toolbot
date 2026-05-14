@@ -145,17 +145,12 @@ async def demo_card_rendering(event: GroupMessageEvent, theme: str = "light"):
         
         footer = f"由 VRChat Bot 生成 | 主题：{theme}"
         
-        # 生成卡片 HTML
-        html_content = html_render_service.create_card_style(
+        # 渲染卡片为图片
+        image_bytes = await html_render_service.render_card(
             title=title,
             content=content,
             footer=footer,
-            theme=theme
-        )
-        
-        # 渲染为图片
-        image_bytes = await html_render_service.render_html(
-            html_content=html_content,
+            theme=theme,
             width=800
         )
         
@@ -207,16 +202,12 @@ async def handle_group_status(bot: Bot, event: GroupMessageEvent, args: Message 
         
         footer = f"QQ群：{event.group_id} | 更新于 {event.time}"
         
-        # 生成并渲染卡片
-        html_content = html_render_service.create_card_style(
+        # 渲染卡片为图片
+        image_bytes = await html_render_service.render_card(
             title=title,
             content=content,
             footer=footer,
-            theme="light"
-        )
-        
-        image_bytes = await html_render_service.render_html(
-            html_content=html_content,
+            theme="light",
             width=800
         )
         
