@@ -13,6 +13,7 @@ from nonebot_plugin_htmlkit import (
     md_to_pic,
     template_to_pic,
     html_to_pic,
+    template_to_html,
 )
 
 # 定义资源路径
@@ -47,12 +48,16 @@ class HTMLRenderService:
         """
         try:
             css_template = await HTMLRenderService._read_css("text.css.j2")
-            # 简单的模板渲染（text.css自备变量）
-            final_css = css_template.format(
-                padding=padding,
-                bg_color=bg_color,
-                font_size=font_size,
-                text_color=text_color
+            # 使用 Jinja2 渲染 CSS 模板，确保语法兼容性
+            final_css = await template_to_html(
+                template_path=str(CSS_DIR),
+                template_name="text.css.j2",
+                templates={
+                    "padding": padding,
+                    "bg_color": bg_color,
+                    "font_size": font_size,
+                    "text_color": text_color
+                }
             )
             
             image_bytes = await template_to_pic(
@@ -214,8 +219,12 @@ class HTMLRenderService:
             }
             colors = themes.get(theme, themes["miku"])
             
-            css_template = await HTMLRenderService._read_css("card.css.j2")
-            final_css = css_template.format(**colors)
+
+            final_css = await template_to_html(
+                template_path=str(CSS_DIR),
+                template_name="card.css.j2",
+                templates=colors
+            )
             
             image_bytes = await template_to_pic(
                 template_path=str(TEMPLATES_DIR),
@@ -227,7 +236,8 @@ class HTMLRenderService:
                     "css": final_css,
                     "decorations": decorations,
                 },
-                width=width,
+                max_width=width,      # 修正参数名：width -> max_width
+                device_height=2000,   # 增加高度防止长内容被截断
                 base_url=f"file://{ASSETS_DIR.as_posix()}/"
             )
             logger.debug(f"卡片渲染成功，图片大小: {len(image_bytes)} bytes")
