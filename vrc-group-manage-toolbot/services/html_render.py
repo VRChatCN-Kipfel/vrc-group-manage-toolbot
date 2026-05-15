@@ -3,8 +3,10 @@ HTML 渲染服务
 基于 nonebot-plugin-htmlkit 提供便捷的图片渲染功能
 """
 
+import markdown
 from typing import Optional, Union
 from pathlib import Path
+import tempfile
 from nonebot import logger
 import aiofiles
 import json
@@ -26,6 +28,7 @@ CONFIG_DIR = Path(__file__).parent.parent / "config" / "pic"
 # 主题配置缓存
 _card_themes_cache: Optional[dict] = None
 _text_themes_cache: Optional[dict] = None
+_markdown_themes_cache: Optional[dict] = None
 
 
 class HTMLRenderService:
@@ -48,6 +51,24 @@ class HTMLRenderService:
             logger.error(f"加载文本主题配置失败: {e}，使用默认配置")
             _text_themes_cache = {}
         return _text_themes_cache
+
+    @staticmethod
+    async def _get_markdown_themes() -> dict:
+        """异步加载 Markdown 主题配置（带缓存）"""
+        global _markdown_themes_cache
+        if _markdown_themes_cache is not None:
+            return _markdown_themes_cache
+        
+        theme_path = CONFIG_DIR / "markdown.theme.json"
+        try:
+            async with aiofiles.open(theme_path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+                _markdown_themes_cache = json.loads(content)
+                logger.debug(f"Markdown 主题配置加载成功: {theme_path}")
+        except Exception as e:
+            logger.error(f"加载 Markdown 主题配置失败: {e}，使用默认配置")
+            _markdown_themes_cache = {}
+        return _markdown_themes_cache
 
     @staticmethod
     async def _get_card_themes() -> dict:
@@ -147,22 +168,62 @@ class HTMLRenderService:
     async def render_markdown(
         markdown_content: str,
         width: int = 800,
-        css_filename: str = "markdown.css",
+        theme: str = "miku",
+        font_set: Optional[str] = None,
+        **overrides,
     ) -> bytes:
         """
-        将 Markdown 内容渲染为图片
+        将 Markdown 内容渲染为图片（支持主题切换）
         
         Args:
             markdown_content: Markdown 格式的内容
             width: 图片宽度
-            css_filename: CSS 文件名 (位于 assets/css/ 目录下)
+            theme: 主题名称 (默认使用 miku)
+            **overrides: 覆盖主题中的其他参数
             
         Returns:
             PNG 图片的字节数据
         """
         try:
-            final_css = await HTMLRenderService._read_css(css_filename)
-            image_bytes = await md_to_pic(markdown_content, width=width, css=final_css)
+            # 1. 加载 Markdown 专属主题配置
+            themes = await HTMLRenderService._get_markdown_themes()
+            params = themes.get(theme, themes.get("miku", {})).copy()
+            
+            if not params:
+                raise ValueError(f"未找到 Markdown 主题 '{theme}' 且无默认 'miku' 主题配置")
+
+            # 2. 处理 font_set 智能识别（复用文本渲染的逻辑）
+            current_font_set = font_set or params.get("font_url")
+            if current_font_set and "://" in current_font_set:
+                params["font_url"] = current_font_set
+            elif font_set:
+                # 如果不是 URL，则视为字体族名称，覆盖 font_body
+                params["font_body"] = font_set
+
+            params.update(overrides)
+
+            # 3. 使用 Jinja2 渲染 CSS 模板
+            final_css = await render_template(
+                template_path=str(CSS_DIR),
+                template_name="markdown.css.j2",
+                templates=params
+            )
+
+            # 4. 创建临时 CSS 文件并调用 md_to_pic
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.css', delete=False, encoding='utf-8') as tmp:
+                tmp.write(final_css)
+                tmp_path = tmp.name
+            
+            try:
+                image_bytes = await md_to_pic(
+                    md=markdown_content, 
+                    max_width=width, 
+                    css_path=tmp_path
+                )
+            finally:
+                # 清理临时文件
+                Path(tmp_path).unlink(missing_ok=True)
+
             logger.debug(f"Markdown 渲染成功，图片大小: {len(image_bytes)} bytes")
             return image_bytes
             
@@ -211,7 +272,7 @@ class HTMLRenderService:
                     else:
                         html_content = f"<style>{final_css}</style>{html_content}"
             
-            image_bytes = await html_to_pic(html_content, width=width)
+            image_bytes = await html_to_pic(html_content, max_width=width)
             logger.debug(f"HTML 渲染成功，图片大小: {len(image_bytes)} bytes")
             return image_bytes
             
@@ -264,7 +325,7 @@ class HTMLRenderService:
                     "css": final_css,
                     "decorations": decorations,
                 },
-                max_width=width,      # 修正参数名：width -> max_width
+                max_width=width,
                 device_height=2000,   # 增加高度防止长内容被截断
                 base_url=f"file://{ASSETS_DIR.as_posix()}/"
             )
