@@ -6,18 +6,11 @@
 
 ### HTML 渲染功能
 
-- **[HTML_RENDER_GUIDE.md](./HTML_RENDER_GUIDE.md)** - HTML 渲染服务使用指南
-  - 安装和配置说明
-  - API 参考文档
-  - 快速开始教程
-  - 故障排除指南
-  - 进阶用法
-
-- **[HTML_RENDER_EXAMPLES.md](./HTML_RENDER_EXAMPLES.md)** - HTML 渲染服务使用示例
-  - 6 个完整的使用示例
-  - 实际应用场景代码
-  - 最佳实践建议
-  - 常见问题解答
+- **[HTML_RENDER.md](./HTML_RENDER.md)** - HTML 渲染服务完整指南
+  - 核心接口详解 (`render_card`, `render_text`, `render_markdown`)
+  - 主题配置系统说明 (卡片与文本主题)
+  - 智能字体识别与自定义字体加载
+  - 高级用法与动态参数覆盖
 
 ## 🔗 相关资源
 
@@ -29,8 +22,8 @@
 ## 💡 使用建议
 
 1. **新用户**：先阅读主 README 了解项目概况
-2. **需要 HTML 渲染功能**：查看 `HTML_RENDER_GUIDE.md` 了解基本概念
-3. **实际开发**：参考 `HTML_RENDER_EXAMPLES.md` 中的代码示例
+2. **需要 HTML 渲染功能**：查看 `HTML_RENDER.md` 了解接口定义与主题配置
+3. **实际开发**：参考 `HTML_RENDER.md` 中的“快速开始”与“高级技巧”章节
 4. **遇到问题**：查阅指南中的"故障排除"部分
 
 ## 📝 文档维护
