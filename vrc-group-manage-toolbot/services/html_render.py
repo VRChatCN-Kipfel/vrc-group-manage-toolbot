@@ -188,7 +188,7 @@ class HTMLRenderService:
             title: 卡片标题
             content: 卡片内容（HTML格式）
             footer: 页脚信息（可选）
-            theme: 主题名称 ("miku", "light", "dark")
+            theme: 主题名称 ("miku", "light", "dark", "lavender", "amber", "ocean", "rose")
             width: 图片宽度
             decorations: 是否启用装饰线（渐变光带、下划线等）
         """

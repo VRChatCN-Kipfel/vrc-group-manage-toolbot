@@ -45,8 +45,8 @@
         "accent_2_rgb": "57, 197, 187",
         "accent_3_rgb": "64, 224, 208"
     },
-    "purple": {
-        "description": "梦幻紫主题",
+    "lavender": {
+        "description": "梦幻薰衣草紫主题",
         "bg_color": "#0c080f",
         "card_bg": "rgba(25, 15, 35, 0.42)",
         "border_color": "rgba(180, 120, 220, 0.22)",
@@ -59,5 +59,50 @@
         "accent_1_rgb": "224, 176, 255",
         "accent_2_rgb": "184, 120, 220",
         "accent_3_rgb": "200, 144, 240"
+    },
+    "amber": {
+        "description": "温暖琥珀金主题",
+        "bg_color": "#1a1208",
+        "card_bg": "rgba(35, 22, 10, 0.42)",
+        "border_color": "rgba(230, 160, 60, 0.22)",
+        "title_color": "#ffd78e",
+        "text_color": "#f5e8d0",
+        "footer_color": "#b09070",
+        "accent_1": "#ffd78e",
+        "accent_2": "#e6a03c",
+        "accent_3": "#f0b860",
+        "accent_1_rgb": "255, 215, 142",
+        "accent_2_rgb": "230, 160, 60",
+        "accent_3_rgb": "240, 184, 96"
+    },
+    "ocean": {
+        "description": "深邃海洋蓝主题",
+        "bg_color": "#080c14",
+        "card_bg": "rgba(10, 18, 30, 0.42)",
+        "border_color": "rgba(140, 200, 255, 0.22)",
+        "title_color": "#b8e0ff",
+        "text_color": "#d8ecf8",
+        "footer_color": "#80a0b8",
+        "accent_1": "#b8e0ff",
+        "accent_2": "#6bb3f0",
+        "accent_3": "#90c8f8",
+        "accent_1_rgb": "184, 224, 255",
+        "accent_2_rgb": "107, 179, 240",
+        "accent_3_rgb": "144, 200, 248"
+    },
+    "rose": {
+        "description": "浪漫玫瑰粉主题",
+        "bg_color": "#1e0814",
+        "card_bg": "rgba(30, 8, 20, 0.42)",
+        "border_color": "rgba(255, 80, 160, 0.22)",
+        "title_color": "#ff80c0",
+        "text_color": "#f0d0e0",
+        "footer_color": "#b07090",
+        "accent_1": "#ff80c0",
+        "accent_2": "#ff4080",
+        "accent_3": "#ff60a0",
+        "accent_1_rgb": "255, 128, 192",
+        "accent_2_rgb": "255, 64, 128",
+        "accent_3_rgb": "255, 96, 160"
     }
 }
