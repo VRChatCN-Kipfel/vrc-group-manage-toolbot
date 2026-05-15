@@ -14,7 +14,7 @@ from nonebot_plugin_htmlkit import (
     md_to_pic,
     template_to_pic,
     html_to_pic,
-    template_to_html,
+    template_to_html as render_template, #你说为什么，这玩意要命名成template_to_html，换个没那么误导性的名字不行吗（
 )
 
 # 定义资源路径
@@ -122,7 +122,7 @@ class HTMLRenderService:
             })
 
             # 渲染 CSS
-            final_css = await template_to_html(
+            final_css = await render_template(
                 template_path=str(CSS_DIR),
                 template_name="text.css.j2",
                 templates=params
@@ -248,7 +248,7 @@ class HTMLRenderService:
                 raise ValueError(f"未找到主题 '{theme}' 且无默认 'miku' 主题配置")
 
             # 使用 Jinja2 正确渲染 CSS 模板，支持 default 过滤器等语法
-            final_css = await template_to_html(
+            final_css = await render_template(
                 template_path=str(CSS_DIR),
                 template_name="card.css.j2",
                 templates=colors
