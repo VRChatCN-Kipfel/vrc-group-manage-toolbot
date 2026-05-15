@@ -1,13 +1,376 @@
+/* ========== CSS 自定义属性：主题色系统 ========== */
+:root {
+    --accent-1: {{ accent_1 | default('#7fffd4') }};
+    --accent-2: {{ accent_2 | default('#39c5bb') }};
+    --accent-3: {{ accent_3 | default('#40e0d0') }};
+    --accent-1-rgb: {{ accent_1_rgb | default('127, 255, 212') }};
+    --accent-2-rgb: {{ accent_2_rgb | default('57, 197, 187') }};
+    --accent-3-rgb: {{ accent_3_rgb | default('64, 224, 208') }};
+}
+
+/* ========== 字体定义 ========== */
+{% if font_url %}
+@font-face {
+    font-family: "CustomFont";
+    src: url("{{ font_url }}")
+        {% if font_url.endswith('.woff2') %}format("woff2"){% 
+        elif font_url.endswith('.ttf') %}format("truetype"){% 
+        elif font_url.endswith('.otf') %}format("opentype"){% 
+        elif font_url.endswith('.woff') %}format("woff"){% 
+        endif %};
+    font-weight: {{ font_weight | default(400) }};
+    font-display: swap;
+}
+{% endif %}
+
+/* ========== 星空背景层 ========== */
+.bg-stars {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background:
+        radial-gradient(ellipse 90% 60% at 20% 80%, rgba(var(--accent-1-rgb), 0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 70% 80% at 75% 20%, rgba(var(--accent-2-rgb), 0.04) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 50% at 50% 50%, rgba(var(--accent-3-rgb), 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse 100% 70% at 85% 85%, rgba(var(--accent-1-rgb), 0.03) 0%, transparent 55%),
+        radial-gradient(ellipse at bottom, #121820 0%, {{ bg_color }} 100%);
+    overflow: hidden;
+}
+
+/* 远星层 */
+.starfield-far {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow:
+        89px 137px 0 #fff,
+        233px 149px 0 rgba(255,255,255,0.9),
+        61px 179px 0 #fff,
+        97px 199px 0 rgba(255,255,255,0.8),
+        113px 251px 0 #fff,
+        163px 107px 0 rgba(255,255,255,0.9),
+        197px 131px 0 #fff,
+        227px 139px 0 rgba(255,255,255,0.7),
+        257px 83px 0 #fff,
+        281px 167px 0 rgba(255,255,255,0.85),
+        313px 101px 0 #fff,
+        337px 211px 0 rgba(255,255,255,0.75),
+        349px 73px 0 #fff,
+        367px 193px 0 rgba(255,255,255,0.9),
+        389px 127px 0 #fff,
+        401px 241px 0 rgba(255,255,255,0.8),
+        409px 151px 0 #fff,
+        419px 89px 0 rgba(255,255,255,0.85),
+        433px 257px 0 #fff,
+        439px 117px 0 rgba(255,255,255,0.7),
+        457px 271px 0 #fff,
+        463px 143px 0 rgba(255,255,255,0.9),
+        479px 181px 0 #fff,
+        487px 293px 0 rgba(255,255,255,0.8),
+        499px 109px 0 #fff,
+        503px 307px 0 rgba(255,255,255,0.75),
+        509px 229px 0 #fff,
+        521px 317px 0 rgba(255,255,255,0.85),
+        541px 157px 0 #fff,
+        547px 331px 0 rgba(255,255,255,0.7),
+        557px 263px 0 #fff,
+        563px 347px 0 rgba(255,255,255,0.9),
+        569px 191px 0 #fff,
+        571px 353px 0 rgba(255,255,255,0.8),
+        137px 233px 0 rgba(var(--accent-1-rgb), 0.9),
+        149px 61px 0 rgba(var(--accent-1-rgb), 0.8),
+        179px 97px 0 rgba(var(--accent-1-rgb), 0.95),
+        199px 113px 0 rgba(var(--accent-1-rgb), 0.85),
+        251px 163px 0 rgba(var(--accent-1-rgb), 0.9),
+        131px 227px 0 rgba(var(--accent-1-rgb), 0.75),
+        139px 257px 0 rgba(var(--accent-1-rgb), 0.9),
+        83px 281px 0 rgba(var(--accent-1-rgb), 0.8),
+        167px 313px 0 rgba(var(--accent-1-rgb), 0.85),
+        101px 337px 0 rgba(var(--accent-1-rgb), 0.9),
+        211px 349px 0 rgba(var(--accent-1-rgb), 0.7),
+        73px 367px 0 rgba(var(--accent-1-rgb), 0.85),
+        193px 389px 0 rgba(var(--accent-1-rgb), 0.9),
+        127px 401px 0 rgba(var(--accent-1-rgb), 0.8),
+        241px 409px 0 rgba(var(--accent-1-rgb), 0.75),
+        151px 419px 0 rgba(var(--accent-1-rgb), 0.9),
+        89px 433px 0 rgba(var(--accent-1-rgb), 0.85),
+        257px 439px 0 rgba(var(--accent-1-rgb), 0.7),
+        117px 457px 0 rgba(var(--accent-1-rgb), 0.9),
+        271px 463px 0 rgba(var(--accent-1-rgb), 0.8),
+        143px 479px 0 rgba(var(--accent-1-rgb), 0.85),
+        181px 487px 0 rgba(var(--accent-1-rgb), 0.75),
+        293px 499px 0 rgba(var(--accent-1-rgb), 0.9),
+        109px 503px 0 rgba(var(--accent-1-rgb), 0.8),
+        307px 509px 0 rgba(var(--accent-1-rgb), 0.85),
+        229px 521px 0 rgba(var(--accent-1-rgb), 0.7),
+        317px 541px 0 rgba(var(--accent-1-rgb), 0.9),
+        157px 547px 0 rgba(var(--accent-1-rgb), 0.8),
+        331px 557px 0 rgba(var(--accent-1-rgb), 0.85),
+        263px 563px 0 rgba(var(--accent-1-rgb), 0.75),
+        347px 569px 0 rgba(var(--accent-1-rgb), 0.9),
+        191px 571px 0 rgba(var(--accent-1-rgb), 0.8),
+        61px 97px 0 rgba(var(--accent-2-rgb), 0.9),
+        113px 131px 0 rgba(var(--accent-2-rgb), 0.85),
+        163px 197px 0 rgba(var(--accent-2-rgb), 0.95),
+        107px 227px 0 rgba(var(--accent-2-rgb), 0.8),
+        139px 257px 0 rgba(var(--accent-2-rgb), 0.9),
+        83px 281px 0 rgba(var(--accent-2-rgb), 0.75),
+        167px 313px 0 rgba(var(--accent-2-rgb), 0.85),
+        101px 337px 0 rgba(var(--accent-2-rgb), 0.9),
+        211px 73px 0 rgba(var(--accent-2-rgb), 0.8),
+        367px 193px 0 rgba(var(--accent-2-rgb), 0.85),
+        389px 127px 0 rgba(var(--accent-2-rgb), 0.9),
+        401px 241px 0 rgba(var(--accent-2-rgb), 0.75),
+        409px 151px 0 rgba(var(--accent-2-rgb), 0.9),
+        419px 89px 0 rgba(var(--accent-2-rgb), 0.8),
+        433px 257px 0 rgba(var(--accent-2-rgb), 0.85),
+        439px 117px 0 rgba(var(--accent-2-rgb), 0.7),
+        457px 271px 0 rgba(var(--accent-2-rgb), 0.9),
+        463px 143px 0 rgba(var(--accent-2-rgb), 0.8),
+        479px 181px 0 rgba(var(--accent-2-rgb), 0.85),
+        487px 293px 0 rgba(var(--accent-2-rgb), 0.75),
+        499px 109px 0 rgba(var(--accent-2-rgb), 0.9),
+        503px 307px 0 rgba(var(--accent-2-rgb), 0.8),
+        509px 229px 0 rgba(var(--accent-2-rgb), 0.85),
+        521px 317px 0 rgba(var(--accent-2-rgb), 0.7),
+        541px 157px 0 rgba(var(--accent-2-rgb), 0.9),
+        547px 331px 0 rgba(var(--accent-2-rgb), 0.8),
+        557px 263px 0 rgba(var(--accent-2-rgb), 0.85),
+        563px 347px 0 rgba(var(--accent-2-rgb), 0.75),
+        569px 191px 0 rgba(var(--accent-2-rgb), 0.9),
+        571px 353px 0 rgba(var(--accent-2-rgb), 0.8),
+        97px 61px 0 rgba(var(--accent-3-rgb), 0.9),
+        131px 113px 0 rgba(var(--accent-3-rgb), 0.85),
+        197px 163px 0 rgba(var(--accent-3-rgb), 0.95),
+        227px 107px 0 rgba(var(--accent-3-rgb), 0.8),
+        257px 139px 0 rgba(var(--accent-3-rgb), 0.9),
+        281px 83px 0 rgba(var(--accent-3-rgb), 0.75),
+        313px 167px 0 rgba(var(--accent-3-rgb), 0.85),
+        337px 101px 0 rgba(var(--accent-3-rgb), 0.9),
+        349px 211px 0 rgba(var(--accent-3-rgb), 0.8),
+        367px 73px 0 rgba(var(--accent-3-rgb), 0.85),
+        389px 193px 0 rgba(var(--accent-3-rgb), 0.9),
+        401px 127px 0 rgba(var(--accent-3-rgb), 0.75),
+        409px 241px 0 rgba(var(--accent-3-rgb), 0.9),
+        419px 151px 0 rgba(var(--accent-3-rgb), 0.8),
+        433px 89px 0 rgba(var(--accent-3-rgb), 0.85),
+        439px 257px 0 rgba(var(--accent-3-rgb), 0.7),
+        457px 117px 0 rgba(var(--accent-3-rgb), 0.9),
+        463px 271px 0 rgba(var(--accent-3-rgb), 0.8),
+        479px 143px 0 rgba(var(--accent-3-rgb), 0.85),
+        487px 181px 0 rgba(var(--accent-3-rgb), 0.75),
+        499px 293px 0 rgba(var(--accent-3-rgb), 0.9),
+        503px 109px 0 rgba(var(--accent-3-rgb), 0.8),
+        509px 307px 0 rgba(var(--accent-3-rgb), 0.85),
+        521px 229px 0 rgba(var(--accent-3-rgb), 0.7),
+        541px 317px 0 rgba(var(--accent-3-rgb), 0.9),
+        547px 157px 0 rgba(var(--accent-3-rgb), 0.8),
+        557px 331px 0 rgba(var(--accent-3-rgb), 0.85),
+        563px 263px 0 rgba(var(--accent-3-rgb), 0.75),
+        569px 347px 0 rgba(var(--accent-3-rgb), 0.9),
+        571px 191px 0 rgba(var(--accent-3-rgb), 0.8);
+    opacity: 0.85;
+}
+
+/* 近星层 */
+.starfield-near {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.star {
+    position: absolute;
+    width: 2.5px;
+    height: 2.5px;
+    border-radius: 50%;
+    background: currentColor;
+    color: rgba(255,255,255,0.9);
+    animation: twinkle 5s ease-in-out infinite;
+    box-shadow: 0 0 4px currentColor;
+}
+
+.star:nth-child(7n)  { animation-delay: -1.43s; color: var(--accent-1); box-shadow: 0 0 6px rgba(var(--accent-1-rgb), 0.6); }
+.star:nth-child(11n) { animation-delay: -2.71s; color: var(--accent-2); box-shadow: 0 0 6px rgba(var(--accent-2-rgb), 0.6); }
+.star:nth-child(13n) { animation-delay: -3.89s; color: var(--accent-3); box-shadow: 0 0 6px rgba(var(--accent-3-rgb), 0.6); }
+.star:nth-child(17n) { animation-delay: -1.03s; color: rgba(var(--accent-1-rgb), 0.8); box-shadow: 0 0 6px rgba(var(--accent-1-rgb), 0.5); }
+.star:nth-child(19n) { animation-delay: -4.57s; color: rgba(var(--accent-2-rgb), 0.8); box-shadow: 0 0 6px rgba(var(--accent-2-rgb), 0.5); }
+.star:nth-child(29n) { transform: scale(1.4); }
+.star:nth-child(31n) { transform: scale(0.7); opacity: 0.6; }
+.star:nth-child(37n) { transform: scale(1.6); }
+
+@keyframes twinkle {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ========== 页面基底 ========== */
 body {
     margin: 0;
-    padding: {{ padding }}px;
+    padding: 0;
     background-color: {{ bg_color }};
-    font-size: {{ font_size }}px;
+    font-size: {{ font_size | default(15) }}px;
     color: {{ text_color }};
-    font-family: "Microsoft YaHei", "SimHei", sans-serif;
-    line-height: 1.6;
+    font-family: {% if font_url %}"CustomFont", {% endif %}{{ font_family | default('"Microsoft YaHei", "SimHei", sans-serif') }};
+    line-height: 1.85;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow-x: hidden;
 }
+
+/* ========== 文本面板 ========== */
+.text-panel {
+    position: relative;
+    max-width: 720px;
+    width: 100%;
+    border-radius: 20px;
+    padding: {{ padding | default(40) }}px {{ padding | default(40) + 8 }}px;
+    z-index: 1;
+    overflow: hidden;
+    background: {{ panel_bg | default('rgba(10, 18, 30, 0.42)') }};
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid {{ border_color }};
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(var(--accent-2-rgb), 0.08),
+        inset 0 0 30px rgba(var(--accent-2-rgb), 0.04);
+}
+
+/* 装饰线：仅在 decorations=true 时生效 */
+.text-panel--decorated::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-1) 0%, var(--accent-2) 35%, var(--accent-3) 65%, var(--accent-1) 100%);
+    opacity: 0.9;
+    z-index: 2;
+    box-shadow: 0 0 16px rgba(var(--accent-2-rgb), 0.35);
+}
+
+/* 内部辉光 */
+.text-panel-glow {
+    position: absolute;
+    top: -40%;
+    left: 10%;
+    width: 80%;
+    height: 80%;
+    background: radial-gradient(ellipse at center, rgba(var(--accent-2-rgb), 0.06), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* 左侧装饰线 */
+.text-panel--decorated::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 60px;
+    bottom: 60px;
+    width: 3px;
+    background: linear-gradient(to bottom, var(--accent-2), transparent);
+    border-radius: 0 3px 3px 0;
+    opacity: 0.5;
+}
+
+/* ========== 文本内容 ========== */
 .content {
     width: 100%;
     word-wrap: break-word;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+.content p {
+    margin: 0 0 16px;
+}
+
+.content p:last-child {
+    margin-bottom: 0;
+}
+
+.content a {
+    color: var(--accent-3);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(var(--accent-3-rgb), 0.3);
+    transition: all 0.2s;
+}
+.content a:hover {
+    color: var(--accent-1);
+    border-bottom-color: var(--accent-1);
+    text-shadow: 0 0 8px rgba(var(--accent-1-rgb), 0.3);
+}
+
+.content code {
+    background: rgba(var(--accent-2-rgb), 0.12);
+    color: var(--accent-1);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 13.5px;
+    border: 1px solid rgba(var(--accent-2-rgb), 0.2);
+}
+
+.content strong,
+.content b {
+    color: var(--accent-1);
+    font-weight: 600;
+}
+
+.content blockquote,
+.content .quote {
+    margin: 16px 0;
+    padding: 12px 20px;
+    border-left: 3px solid var(--accent-2);
+    background: rgba(var(--accent-2-rgb), 0.06);
+    border-radius: 0 8px 8px 0;
+    color: rgba(var(--accent-1-rgb), 0.8);
+    font-style: italic;
+}
+
+.content hr,
+.content .divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(var(--accent-2-rgb), 0.4), transparent);
+    margin: 24px 0;
+}
+
+.content ul,
+.content ol {
+    margin: 0 0 16px;
+    padding-left: 24px;
+}
+.content li {
+    margin-bottom: 8px;
+}
+.content ul li::marker {
+    color: var(--accent-2);
+}
+
+.content .meta,
+.content .timestamp {
+    font-size: 12px;
+    color: rgba(var(--accent-2-rgb), 0.7);
+    letter-spacing: 0.5px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(var(--accent-2-rgb), 0.2);
+    text-align: right;
 }

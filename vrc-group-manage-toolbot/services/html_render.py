@@ -25,11 +25,30 @@ CONFIG_DIR = Path(__file__).parent.parent / "config" / "pic"
 
 # 主题配置缓存
 _card_themes_cache: Optional[dict] = None
+_text_themes_cache: Optional[dict] = None
 
 
 class HTMLRenderService:
     """HTML 渲染服务 - 提供统一的图片渲染接口"""
     
+    @staticmethod
+    async def _get_text_themes() -> dict:
+        """异步加载文本主题配置（带缓存）"""
+        global _text_themes_cache
+        if _text_themes_cache is not None:
+            return _text_themes_cache
+        
+        theme_path = CONFIG_DIR / "text.theme.json"
+        try:
+            async with aiofiles.open(theme_path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+                _text_themes_cache = json.loads(content)
+                logger.debug(f"文本主题配置加载成功: {theme_path}")
+        except Exception as e:
+            logger.error(f"加载文本主题配置失败: {e}，使用默认配置")
+            _text_themes_cache = {}
+        return _text_themes_cache
+
     @staticmethod
     async def _get_card_themes() -> dict:
         global _card_themes_cache #缓存卡片配置
@@ -59,34 +78,62 @@ class HTMLRenderService:
     @staticmethod
     async def render_text(
         text: str,
-        font_size: int = 16,
+        theme: str = "miku",
         width: int = 800,
-        padding: int = 20,
-        bg_color: str = "#ffffff",
-        text_color: str = "#000000",
+        font_set: Optional[str] = None,  # 字体集：可以是字体名或 URL
+        decorations: bool = True,
+        **overrides,
     ) -> bytes:
         """
         将纯文本渲染为图片
+        
+        Args:
+            text: 文本内容
+            theme: 主题名称 ("miku", "lxgw", "code")
+            width: 图片宽度
+            font_set: 字体设置。如果包含 `://` 则视为 URL/路径，否则视为字体族名称
+            decorations: 是否启用装饰线
+            **overrides: 覆盖主题中的其他参数 (如 padding, font_size 等)
         """
         try:
-            css_template = await HTMLRenderService._read_css("text.css.j2")
-            # 使用 Jinja2 渲染 CSS 模板，确保语法兼容性
+            themes = await HTMLRenderService._get_text_themes()
+            params = themes.get(theme, themes.get("miku", {})).copy()
+            
+            if not params:
+                raise ValueError(f"未找到主题 '{theme}' 且无默认 'miku' 主题配置")
+
+            # 处理 font_set 自动识别逻辑
+            final_font_url = ""
+            final_font_family = params.get("font_family", "sans-serif")
+            
+            current_font_set = font_set or params.get("font_set")
+            if current_font_set:
+                if "://" in current_font_set:
+                    final_font_url = current_font_set
+                else:
+                    final_font_family = current_font_set
+
+            # 合并覆盖参数
+            params.update(overrides)
+            params.update({
+                "font_url": final_font_url,
+                "font_family": final_font_family,
+                "decorations": decorations,
+            })
+
+            # 渲染 CSS
             final_css = await template_to_html(
                 template_path=str(CSS_DIR),
                 template_name="text.css.j2",
-                templates={
-                    "padding": padding,
-                    "bg_color": bg_color,
-                    "font_size": font_size,
-                    "text_color": text_color
-                }
+                templates=params
             )
             
             image_bytes = await template_to_pic(
                 template_path=str(TEMPLATES_DIR),
                 template_name="text.html.j2",
-                templates={"text": text, "css": final_css},
-                width=width,
+                templates={"text": text, "css": final_css, "decorations": decorations},
+                max_width=width,
+                device_height=2000,
                 base_url=f"file://{ASSETS_DIR.as_posix()}/"
             )
             logger.debug(f"文本渲染成功，图片大小: {len(image_bytes)} bytes")
