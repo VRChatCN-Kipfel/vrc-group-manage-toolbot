@@ -94,14 +94,29 @@ async def render_text(
 ---
 
 ### 3. Markdown 渲染 (`render_markdown`)
-直接将 Markdown 语法转换为图片。
+将 Markdown 语法转换为带有精美主题样式的图片。
 
+**函数签名：**
 ```python
-image_bytes = await html_render_service.render_markdown(
-    markdown_content="# 标题\n- 列表项",
-    width=800
-)
+async def render_markdown(
+    markdown_content: str,
+    width: int = 800,
+    theme: str = "miku",
+    font_set: Optional[str] = None,
+    **overrides
+) -> bytes
 ```
+
+**可用主题 (Theme):**
+*   `miku`: 初音未来科技青（默认）
+*   `sakura`: 樱花粉夜（文学风格，带首字下沉）
+*   `amber`: 琥珀暖金（适合长文阅读）
+*   `forest`: 森林自然风
+*   `ocean`: 深海蓝调
+*   `nord`: 北欧灰蓝（护眼编程向）
+*   `monokai`: 经典高对比编辑器风
+*   `cyberpunk`: 赛博霓虹锐角风
+*   `light`: 浅色明亮商务风
 
 ---
 
@@ -159,8 +174,9 @@ await html_render_service.render_text(
 
 ---
 
-## 📝 注意事项
+## ⚠️ 已知问题与注意事项
 
-1.  **资源路径**：渲染引擎依赖 `base_url` 来定位本地资源，请确保 `assets` 目录路径正确。
-2.  **性能优化**：主题配置文件在首次加载后会自动缓存，修改配置后需重启服务或通过定时任务重载。
-3.  **内容截断**：如果内容过长，请适当增加 `device_height` 参数（目前默认设为 2000px）。
+1.  **Markdown 图片路径**：由于 `md_to_pic` 内部使用临时文件处理动态 CSS，Markdown 内容中的相对路径图片（如 `![图](./pic.jpg)`）可能无法正确加载。建议 Markdown 中的图片使用**绝对网络 URL**。
+2.  **资源路径**：渲染引擎依赖 `base_url` 来定位本地资源，请确保 `assets` 目录路径正确。
+3.  **性能优化**：主题配置文件在首次加载后会自动缓存，修改配置后需重启服务或通过定时任务重载。
+4.  **内容截断**：如果内容过长，请适当增加 `device_height` 参数（目前默认设为 2000px）。
