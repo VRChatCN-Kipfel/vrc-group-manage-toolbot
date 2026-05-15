@@ -7,6 +7,7 @@ from typing import Optional, Union
 from pathlib import Path
 from nonebot import logger
 import aiofiles
+import json
 
 from nonebot_plugin_htmlkit import (
     text_to_pic,
@@ -20,11 +21,32 @@ from nonebot_plugin_htmlkit import (
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 TEMPLATES_DIR = ASSETS_DIR / "templates"
 CSS_DIR = ASSETS_DIR / "css"
+CONFIG_DIR = Path(__file__).parent.parent / "config" / "pic"
+
+# 主题配置缓存
+_card_themes_cache: Optional[dict] = None
 
 
 class HTMLRenderService:
     """HTML 渲染服务 - 提供统一的图片渲染接口"""
     
+    @staticmethod
+    async def _get_card_themes() -> dict:
+        global _card_themes_cache #缓存卡片配置
+        if _card_themes_cache is not None:
+            return _card_themes_cache
+        
+        theme_path = CONFIG_DIR / "card.theme.json"
+        try:
+            async with aiofiles.open(theme_path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+                _card_themes_cache = json.loads(content)
+                logger.debug(f"卡片主题配置加载成功: {theme_path}")
+        except Exception as e:
+            logger.error(f"加载卡片主题配置失败: {e}，使用默认配置")
+            _card_themes_cache = {} # 返回空字典，后续逻辑会处理 fallback
+        return _card_themes_cache
+
     @staticmethod
     async def _read_css(css_filename: str) -> str:
         """读取 CSS 文件内容"""
@@ -171,55 +193,14 @@ class HTMLRenderService:
             decorations: 是否启用装饰线（渐变光带、下划线等）
         """
         try:
-            # 主题配色逻辑保留在 Python 层，方便动态切换
-            themes = {
-                "miku": {  # 初音未来主题（默认）
-                    "bg_color": "#08080c",                    # 深邃黑
-                    "card_bg": "rgba(10, 18, 30, 0.42)",     # 半透明深蓝
-                    "border_color": "rgba(57, 197, 187, 0.22)",  # 初音绿半透明
-                    "title_color": "#7fffd4",                # 薄荷绿
-                    "text_color": "#d0f0ee",                 # 浅青白
-                    "footer_color": "#5aaeb0",               # 青绿色
-                    # CSS 变量系统 - 强调色（使用默认值）
-                    "accent_1": "#7fffd4",                   # 薄荷绿
-                    "accent_2": "#39c5bb",                   # 初音绿
-                    "accent_3": "#40e0d0",                   # 湖水蓝
-                    "accent_1_rgb": "127, 255, 212",
-                    "accent_2_rgb": "57, 197, 187",
-                    "accent_3_rgb": "64, 224, 208",
-                },
-                "light": {
-                    "bg_color": "#ffffff", 
-                    "card_bg": "rgba(248, 249, 250, 0.9)",
-                    "border_color": "rgba(57, 197, 187, 0.3)",
-                    "title_color": "#2c3e50", 
-                    "text_color": "#333333",
-                    "footer_color": "#666666",
-                    "accent_1": "#7fffd4",
-                    "accent_2": "#39c5bb",
-                    "accent_3": "#40e0d0",
-                    "accent_1_rgb": "127, 255, 212",
-                    "accent_2_rgb": "57, 197, 187",
-                    "accent_3_rgb": "64, 224, 208",
-                },
-                "dark": {
-                    "bg_color": "#1a1a1a", 
-                    "card_bg": "rgba(45, 45, 45, 0.85)",
-                    "border_color": "rgba(57, 197, 187, 0.2)",
-                    "title_color": "#ecf0f1", 
-                    "text_color": "#bdc3c7",
-                    "footer_color": "#95a5a6",
-                    "accent_1": "#7fffd4",
-                    "accent_2": "#39c5bb",
-                    "accent_3": "#40e0d0",
-                    "accent_1_rgb": "127, 255, 212",
-                    "accent_2_rgb": "57, 197, 187",
-                    "accent_3_rgb": "64, 224, 208",
-                }
-            }
-            colors = themes.get(theme, themes["miku"])
+            # 从配置文件加载主题
+            themes = await HTMLRenderService._get_card_themes()
+            colors = themes.get(theme, themes.get("miku", {}))
             
+            if not colors:
+                raise ValueError(f"未找到主题 '{theme}' 且无默认 'miku' 主题配置")
 
+            # 使用 Jinja2 正确渲染 CSS 模板，支持 default 过滤器等语法
             final_css = await template_to_html(
                 template_path=str(CSS_DIR),
                 template_name="card.css.j2",

@@ -1,0 +1,63 @@
+{
+    "_info": "卡片渲染主题配置文件。颜色值支持 HEX 和 RGBA 字符串。",
+    "miku": {
+        "description": "初音未来主题（默认）",
+        "bg_color": "#08080c",
+        "card_bg": "rgba(10, 18, 30, 0.42)",
+        "border_color": "rgba(57, 197, 187, 0.22)",
+        "title_color": "#7fffd4",
+        "text_color": "#d0f0ee",
+        "footer_color": "#5aaeb0",
+        "accent_1": "#7fffd4",
+        "accent_2": "#39c5bb",
+        "accent_3": "#40e0d0",
+        "accent_1_rgb": "127, 255, 212",
+        "accent_2_rgb": "57, 197, 187",
+        "accent_3_rgb": "64, 224, 208"
+    },
+    "light": {
+        "description": "浅色明亮主题",
+        "bg_color": "#ffffff",
+        "card_bg": "rgba(248, 249, 250, 0.9)",
+        "border_color": "rgba(57, 197, 187, 0.3)",
+        "title_color": "#2c3e50",
+        "text_color": "#333333",
+        "footer_color": "#666666",
+        "accent_1": "#7fffd4",
+        "accent_2": "#39c5bb",
+        "accent_3": "#40e0d0",
+        "accent_1_rgb": "127, 255, 212",
+        "accent_2_rgb": "57, 197, 187",
+        "accent_3_rgb": "64, 224, 208"
+    },
+    "dark": {
+        "description": "深色护眼主题",
+        "bg_color": "#1a1a1a",
+        "card_bg": "rgba(45, 45, 45, 0.85)",
+        "border_color": "rgba(57, 197, 187, 0.2)",
+        "title_color": "#ecf0f1",
+        "text_color": "#bdc3c7",
+        "footer_color": "#95a5a6",
+        "accent_1": "#7fffd4",
+        "accent_2": "#39c5bb",
+        "accent_3": "#40e0d0",
+        "accent_1_rgb": "127, 255, 212",
+        "accent_2_rgb": "57, 197, 187",
+        "accent_3_rgb": "64, 224, 208"
+    },
+    "purple": {
+        "description": "梦幻紫主题",
+        "bg_color": "#0c080f",
+        "card_bg": "rgba(25, 15, 35, 0.42)",
+        "border_color": "rgba(180, 120, 220, 0.22)",
+        "title_color": "#e0b0ff",
+        "text_color": "#e8d5f5",
+        "footer_color": "#a080b0",
+        "accent_1": "#e0b0ff",
+        "accent_2": "#b878dc",
+        "accent_3": "#c890f0",
+        "accent_1_rgb": "224, 176, 255",
+        "accent_2_rgb": "184, 120, 220",
+        "accent_3_rgb": "200, 144, 240"
+    }
+}
