@@ -11,7 +11,6 @@
 | 用户绑定 | 5 | QQ↔VRChat 账号绑定与查询 |
 | 群组绑定 | 1 | QQ 群与 VRChat 群组绑定管理 |
 | 系统 | 3 | 登录、两步验证、Cookie 直登 |
-| HTML渲染 | 3 | 文本/Markdown转图片、卡片生成 |
 
 ---
 
@@ -148,16 +147,6 @@ python run.py
 
 详细文档请查看 [CONFIG_GUIDE.md](./CONFIG_GUIDE.md)
 
-### 🎨 HTML 渲染功能（示例）
-
-| 命令 | 用法 | 说明 |
-|------|------|------|
-| `#htmldemo [类型]` | `#htmldemo text/md/card/dark` | HTML 渲染演示 |
-| `#groupstatus` | 直接发送 | 显示群组状态卡片 |
-| `#htmlhelp` | 直接发送 | 显示帮助信息 |
-
-详细文档请查看 [HTML_RENDER_GUIDE.md](./docs/HTML_RENDER_GUIDE.md)
-
 ---
 
 ## 项目结构
@@ -175,8 +164,7 @@ vrc-group-manage-toolbot/
 │   ├── group_admin.py      # 群管理命令（12个）
 │   ├── user_bind.py        # 用户绑定命令（5个）
 │   ├── config_manager.py   # 配置管理
-│   ├── group_bind.py       # 群组绑定命令
-│   └── html_render_demo.py # HTML 渲染示例插件
+│   └── group_bind.py       # 群组绑定命令
 │
 ├── services/               # 服务层（插件 ↔ 后端）
 │   ├── api_guard.py        # 速率控制 + 指数退避 + 缓存
@@ -184,7 +172,8 @@ vrc-group-manage-toolbot/
 │   ├── message_utils.py    # 消息格式化/分段
 │   ├── user_binding.py     # 绑定数据持久化
 │   ├── group_config.py     # 每群独立配置
-│   └── html_render.py      # HTML 渲染服务
+│   ├── html_render.py      # HTML 渲染服务
+│   └── scheduler_service.py # 定时任务调度器
 │
 ├── utils/                  # 后端
 │   └── VRC/
@@ -193,8 +182,9 @@ vrc-group-manage-toolbot/
 │       └── vrc_models.py   # Pydantic 数据模型
 │
 ├── docs/                   # 文档目录
-│   ├── HTML_RENDER_GUIDE.md      # HTML 渲染使用指南
-│   └── HTML_RENDER_EXAMPLES.md   # HTML 渲染使用示例
+│   ├── HTML_RENDER.md            # HTML 渲染使用指南
+│   ├── SCHEDULER_USAGE.md        # 定时任务调度器使用指南
+│   └── README.md                 # 文档索引
 │
 └── data/                   # 运行时数据（不提交）
     ├── bindings.json
@@ -228,17 +218,9 @@ vrc-group-manage-toolbot/
 
 ## 权限体系
 
-### 基础权限等级
+### 六级权限体系
 
-| 等级 | 身份 | 权限 |
-|------|------|------|
-| Lv0 | 普通 QQ 用户 | 查询、绑定、帮助 |
-| Lv1 | QQ 群管理员/群主 | 群管理操作、Bot 状态 |
-| Lv2 | 超级用户 (SUPERUSERS) | 强制绑定、Bot 调试、配置管理 |
-
-### 六级权限体系（v0.2.2+）
-
-系统现在根据 **QQ身份** 与 **VRChat绑定状态** 自动判定 6 级权限：
+系统根据 **QQ身份** 与 **VRChat绑定状态** 自动判定 6 级权限：
 
 | 等级 | 身份描述 | 说明 |
 |------|----------|------|
@@ -259,6 +241,12 @@ vrc-group-manage-toolbot/
 ```
 
 详见 [CONFIG_GUIDE.md](./CONFIG_GUIDE.md)
+
+### ⏰ 定时任务调度
+
+系统内置定时任务调度器，支持间隔任务、Cron 表达式任务和一次性任务。
+
+详细文档请查看 [SCHEDULER_USAGE.md](./docs/SCHEDULER_USAGE.md)
 
 ---
 

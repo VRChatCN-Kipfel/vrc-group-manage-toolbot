@@ -1,5 +1,88 @@
 # Changelog
 
+## v0.3.2 — 2026-05-17
+
+### 🚀 新增功能
+
+#### HTML 渲染服务
+- **新增 `services/html_render.py`** — HTML 渲染服务
+  - `render_card()` - 卡片渲染（支持主题配置）
+  - `render_text()` - 文本渲染（支持主题配置）
+  - `render_markdown()` - Markdown 渲染（支持主题配置）
+  - 集成 `nonebot-plugin-htmlkit` 实现 HTML 转图片功能
+  - 支持外部图片嵌入及尺寸控制
+
+- **新增主题配置系统**
+  - 卡片主题配置 (`config/pic/card.theme.json`)
+  - 文本主题配置 (`config/pic/text.theme.json`)
+  - Markdown 主题配置 (`config/pic/markdown.theme.json`)
+  - 支持智能字体识别与自定义字体加载
+
+- **新增模板资源**
+  - HTML 模板文件 (`assets/templates/card.html.j2`, `text.html.j2`)
+  - CSS 样式文件 (`assets/css/card.css.j2`, `text.css.j2`, `markdown.css.j2`)
+
+- **文档**
+  - 新增 `docs/HTML_RENDER.md` - HTML 渲染服务完整指南
+
+#### 定时任务调度器
+- **新增 `services/scheduler_service.py`** — 定时任务调度服务
+  - 支持间隔任务（Interval）
+  - 支持 Cron 表达式任务
+  - 支持一次性任务（Date）
+  - 提供完整的任务管理功能（查看、暂停、恢复、删除、修改）
+  - 任务 ID 唯一性保护与强制覆盖机制
+
+- **文档**
+  - 新增 `docs/SCHEDULER_USAGE.md` - 定时任务调度器使用指南
+
+### 🔧 改进
+
+- **权限系统优化** (`services/permission.py`)
+  - 修复 MessageEvent 类型不安全导致崩溃问题
+  - 优化权限检查逻辑
+
+- **CSS 注入逻辑优化** (`services/html_render.py`)
+  - 统一在 `<head>` 中添加 style 块
+  - 优化模板渲染函数命名以提高可读性
+
+- **依赖更新** (`pyproject.toml`)
+  - 新增 `nonebot-plugin-htmlkit` 依赖
+  - 新增 `nonebot-plugin-apscheduler` 依赖
+
+### 📁 文件变更
+
+```
++(新增) services/html_render.py          # HTML 渲染服务
++(新增) services/scheduler_service.py    # 定时任务调度器
++(新增) assets/templates/*.html.j2       # HTML 模板文件
++(新增) assets/css/*.css.j2              # CSS 样式文件
++(新增) config/pic/*.theme.json          # 主题配置文件
++(新增) docs/HTML_RENDER.md              # HTML 渲染文档
++(新增) docs/SCHEDULER_USAGE.md          # 定时任务文档
+M services/permission.py                 # 修复类型安全问题
+M pyproject.toml                         # 新增依赖
+M docs/README.md                         # 更新文档索引
+```
+
+---
+
+## v0.3.1 — 2026-05-10
+
+### 🐛 修复
+
+- **MessageEvent 类型安全** (`services/permission.py`)
+  - 修复 MessageEvent 类型不安全导致崩溃问题
+  - 确保权限检查函数能正确处理不同类型的事件
+
+### 🔧 改进
+
+- **代码清理**
+  - 移除未使用的导入和变量
+  - 优化错误处理逻辑
+
+---
+
 ## v0.3.0 — 2026-05-08
 
 ### 🚀 重大安全升级：群组绑定模型全面转换

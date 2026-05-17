@@ -1,6 +1,6 @@
 [project]
 name = "vrc-group-manage-toolbot"
-version = "0.2.0"
+version = "0.3.2"
 description = "vrc-group-manage-toolbot"
 readme = "README.md"
 requires-python = ">=3.10, <4.0"
@@ -15,7 +15,7 @@ dependencies = [
 [tool.nonebot]
 plugin_dirs = ["plugins"]
 builtin_plugins = ["echo", "single_session"]
-plugins = ["nonebot_plugin_apscheduler"]
+plugins = ["nonebot-plugin-htmlkit", "nonebot_plugin_apscheduler"]
 
 [tool.nonebot.adapters]
 nonebot-adapter-onebot = [
@@ -27,3 +27,4 @@ nonebot-adapter-onebot = [
 "@local" = []
 nonebot-plugin-localstore = ["nonebot_plugin_localstore"]
 nonebot-plugin-htmlkit = ["nonebot_plugin_htmlkit"]
+nonebot_plugin_apscheduler = ["nonebot_plugin_apscheduler"]
