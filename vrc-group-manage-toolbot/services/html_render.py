@@ -3,7 +3,7 @@ HTML 渲染服务
 基于 nonebot-plugin-htmlkit 提供便捷的图片渲染功能
 """
 
-import markdown
+
 from typing import Optional, Union
 from pathlib import Path
 import tempfile
@@ -253,24 +253,18 @@ class HTMLRenderService:
             if css_filename:
                 final_css = await HTMLRenderService._read_css(css_filename)
                 
-            # 如果提供了额外 CSS，注入到 HTML 中
+            # 如果提供了额外 CSS，在 <head> 中添加新的 style 块
             if final_css:
-                if "<style>" in html_content:
-                    # 在最后一个 </style> 前插入
+                if "<head>" in html_content:
+                    # 在 <head> 标签后添加 style
                     html_content = html_content.replace(
-                        "</style>",
-                        f"{final_css}</style>",
+                        "<head>",
+                        f"<head><style>{final_css}</style>",
                         1
                     )
                 else:
-                    # 在 <head> 中添加 style
-                    if "<head>" in html_content:
-                        html_content = html_content.replace(
-                            "<head>",
-                            f"<head><style>{final_css}</style>"
-                        )
-                    else:
-                        html_content = f"<style>{final_css}</style>{html_content}"
+                    # 如果没有 <head>，在最前面添加
+                    html_content = f"<head><style>{final_css}</style></head>{html_content}"
             
             image_bytes = await html_to_pic(html_content, max_width=width)
             logger.debug(f"HTML 渲染成功，图片大小: {len(image_bytes)} bytes")
