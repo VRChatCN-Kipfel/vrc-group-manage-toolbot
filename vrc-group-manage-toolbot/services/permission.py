@@ -2,11 +2,11 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Optional, Dict, List
 from datetime import datetime
 import json
-import os
 from pathlib import Path
 
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, MessageEvent
+from nonebot_plugin_localstore import get_data_dir
 
 if TYPE_CHECKING:
     from utils import VRCClient
@@ -45,8 +45,8 @@ _temp_permissions: Dict[str, PermissionLevel] = {}
 class BlacklistStore:
     """黑名单持久化存储管理器"""
     
-    def __init__(self, data_dir: str = "data/vrc_toolbot"):
-        self.data_dir = Path(data_dir)
+    def __init__(self):
+        self.data_dir = get_data_dir("vrc_toolbot")
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.blacklist_file = self.data_dir / "blacklist.json"
         self.blacklist: Dict[str, dict] = {}  # {qq_id: ban_info}

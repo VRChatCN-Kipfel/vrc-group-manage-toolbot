@@ -41,7 +41,7 @@ COMMAND_DEFAULTS = {
     "gaudit": {"enabled": False, "permission": PermissionLevel.OWNER},
     
     # Bot 配置管理子命令
-    "bot_blacklist": {"enabled": True, "permission": PermissionLevel.SUPERUSER},  # #bot blacklist 子命令（注意！该值设为3以下的数值将不会生效！）
+    "bot_blacklist": {"enabled": True, "permission": PermissionLevel.SUPERUSER},  #bot blacklist 子命令（注意！该值设为3以下的数值将不会生效！）
 }
 
 
