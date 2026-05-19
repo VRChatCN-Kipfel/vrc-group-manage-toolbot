@@ -39,13 +39,16 @@ COMMAND_DEFAULTS = {
     "gannounce": {"enabled": False, "permission": PermissionLevel.OWNER},
     "gdelannounce": {"enabled": False, "permission": PermissionLevel.OWNER},
     "gaudit": {"enabled": False, "permission": PermissionLevel.OWNER},
+    
+    # Bot 配置管理子命令
+    "bot_blacklist": {"enabled": True, "permission": PermissionLevel.SUPERUSER},  # #bot blacklist 子命令（注意！该值设为3以下的数值将不会生效！）
 }
 
 
 class CommandConfig(BaseModel):
     """单个命令的配置"""
     enabled: bool = True
-    permission: int = Field(default=0, ge=0, le=5)  # 0-5 对应新的6级权限体系
+    permission: int = Field(default=0, ge=-1, le=5)  # -1 到 5 对应7级权限体系
     
     def get_permission_level(self) -> PermissionLevel:
         return PermissionLevel(self.permission)

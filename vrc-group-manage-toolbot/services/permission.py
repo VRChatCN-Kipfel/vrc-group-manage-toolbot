@@ -1,5 +1,9 @@
 from enum import IntEnum
-from typing import TYPE_CHECKING, Optional, Dict
+from typing import TYPE_CHECKING, Optional, Dict, List
+from datetime import datetime
+import json
+import os
+from pathlib import Path
 
 from nonebot import logger
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, MessageEvent
@@ -9,6 +13,7 @@ if TYPE_CHECKING:
 
 
 class PermissionLevel(IntEnum):
+    BANNED_USER = -1      # 被封禁用户
     UNBOUND_USER = 0      # 未绑定普通成员
     BOUND_USER = 1        # 已绑定普通成员
     UNBOUND_ADMIN = 2     # 未绑定管理员
@@ -20,6 +25,7 @@ class PermissionLevel(IntEnum):
     def from_str(cls, level_str: str) -> "PermissionLevel":
         """从字符串转换为权限等级"""
         mapping = {
+            "banned": cls.BANNED_USER, "-1": cls.BANNED_USER,
             "unbound_user": cls.UNBOUND_USER, "0": cls.UNBOUND_USER,
             "bound_user": cls.BOUND_USER, "1": cls.BOUND_USER,
             "unbound_admin": cls.UNBOUND_ADMIN, "2": cls.UNBOUND_ADMIN,
@@ -34,12 +40,173 @@ class PermissionLevel(IntEnum):
 _temp_permissions: Dict[str, PermissionLevel] = {}
 
 
+# ==================== 黑名单持久化存储 ====================
+
+class BlacklistStore:
+    """黑名单持久化存储管理器"""
+    
+    def __init__(self, data_dir: str = "data/vrc_toolbot"):
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.blacklist_file = self.data_dir / "blacklist.json"
+        self.blacklist: Dict[str, dict] = {}  # {qq_id: ban_info}
+        self._load()
+    
+    def _load(self):
+        """从文件加载黑名单数据"""
+        if self.blacklist_file.exists():
+            try:
+                with open(self.blacklist_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.blacklist = data.get("banned_users", {})
+                logger.info(f"已加载 {len(self.blacklist)} 条黑名单记录")
+            except Exception as e:
+                logger.error(f"加载黑名单失败: {e}")
+                self.blacklist = {}
+        else:
+            logger.info("黑名单文件不存在，创建新的黑名单")
+            self.blacklist = {}
+            self._save()
+    
+    def _save(self):
+        """保存黑名单数据到文件"""
+        try:
+            data = {
+                "version": "1.0",
+                "last_updated": datetime.now().isoformat(),
+                "banned_users": self.blacklist
+            }
+            with open(self.blacklist_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.debug("黑名单数据已保存")
+        except Exception as e:
+            logger.error(f"保存黑名单失败: {e}")
+    
+    def add_ban(
+        self,
+        banned_qq: str,
+        banned_by: str,
+        reason: str = "未说明",
+        group_id: Optional[str] = None,
+        group_name: Optional[str] = None,
+        message_context: Optional[str] = None,
+        ban_type: str = "manual"  # manual/auto/expired
+    ) -> bool:
+        """
+        添加用户到黑名单
+        
+        Args:
+            banned_qq: 被封禁的 QQ 号
+            banned_by: 执行封禁的操作者 QQ 号
+            reason: 封禁原因
+            group_id: 封禁发生的群 ID（可选）
+            group_name: 封禁发生的群名称（可选）
+            message_context: 触发封禁的消息上下文（可选）
+            ban_type: 封禁类型 (manual/auto/expired)
+        
+        Returns:
+            是否成功添加
+        """
+        banned_qq = str(banned_qq)
+        banned_by = str(banned_by)
+        
+        ban_info = {
+            "banned_qq": banned_qq,
+            "banned_by": banned_by,
+            "reason": reason,
+            "group_id": group_id,
+            "group_name": group_name,
+            "message_context": message_context,
+            "ban_type": ban_type,
+            "banned_at": datetime.now().isoformat(),
+            "expires_at": None,  # 可以扩展为临时封禁
+            "status": "active"  # active/removed/expired
+        }
+        
+        self.blacklist[banned_qq] = ban_info
+        self._save()
+        logger.info(f"已将 {banned_qq} 加入黑名单，操作者: {banned_by}, 原因: {reason}")
+        return True
+    
+    def remove_ban(self, qq_id: str, removed_by: str, reason: str = "未说明") -> bool:
+        """
+        从黑名单移除用户
+        
+        Args:
+            qq_id: 要解封的 QQ 号
+            removed_by: 执行解封的操作者 QQ 号
+            reason: 解封原因
+        
+        Returns:
+            是否成功移除
+        """
+        qq_id = str(qq_id)
+        
+        if qq_id not in self.blacklist:
+            logger.warning(f"QQ {qq_id} 不在黑名单中")
+            return False
+        
+        # 保留历史记录，标记为 removed
+        ban_info = self.blacklist[qq_id]
+        ban_info["status"] = "removed"
+        ban_info["removed_by"] = str(removed_by)
+        ban_info["removed_at"] = datetime.now().isoformat()
+        ban_info["remove_reason"] = reason
+        
+        # 也可以选择完全删除：del self.blacklist[qq_id]
+        # 这里选择保留历史，但标记为非活跃
+        self._save()
+        logger.info(f"已将 {qq_id} 从黑名单移除，操作者: {removed_by}")
+        return True
+    
+    def is_blacklisted(self, qq_id: str) -> bool:
+        """检查用户是否在黑名单中（仅检查活跃状态）"""
+        qq_id = str(qq_id)
+        if qq_id not in self.blacklist:
+            return False
+        return self.blacklist[qq_id].get("status") == "active"
+    
+    def get_ban_info(self, qq_id: str) -> Optional[dict]:
+        """获取用户的封禁详细信息"""
+        qq_id = str(qq_id)
+        return self.blacklist.get(qq_id)
+    
+    def get_all_bans(self, active_only: bool = True) -> List[dict]:
+        """
+        获取所有黑名单记录
+        
+        Args:
+            active_only: 是否只返回活跃状态的封禁
+        
+        Returns:
+            封禁记录列表
+        """
+        if active_only:
+            return [
+                info for info in self.blacklist.values()
+                if info.get("status") == "active"
+            ]
+        return list(self.blacklist.values())
+    
+    def get_ban_count(self, active_only: bool = True) -> int:
+        """获取黑名单用户数量"""
+        return len(self.get_all_bans(active_only))
+
+
+# 全局黑名单存储实例
+blacklist_store = BlacklistStore()
+
+
 async def get_permission_level(bot: Bot, event: MessageEvent) -> PermissionLevel:
     from .user_binding import user_binding_store
     
     user_id = event.user_id
     sender = event.sender
     qq_id = str(user_id)
+    
+    # -1. 检查是否在黑名单中（最高优先级）
+    if blacklist_store.is_blacklisted(qq_id):
+        return PermissionLevel.BANNED_USER
     
     # 0. 检查是否有临时设定的权限 (优先级最高)
     temp = _temp_permissions.get(qq_id)
@@ -156,6 +323,7 @@ async def check_command_permission(
         # 检查权限等级
         if user_level < required_level:
             level_names = {
+                PermissionLevel.BANNED_USER: "被封禁用户",
                 PermissionLevel.UNBOUND_USER: "未绑定成员",
                 PermissionLevel.BOUND_USER: "已绑定成员",
                 PermissionLevel.UNBOUND_ADMIN: "未绑定管理员",
@@ -184,6 +352,7 @@ async def check_command_permission(
     # 检查权限等级
     if user_level < required_level:
         level_names = {
+            PermissionLevel.BANNED_USER: "被封禁用户",
             PermissionLevel.UNBOUND_USER: "未绑定成员",
             PermissionLevel.BOUND_USER: "已绑定成员",
             PermissionLevel.UNBOUND_ADMIN: "未绑定管理员",
