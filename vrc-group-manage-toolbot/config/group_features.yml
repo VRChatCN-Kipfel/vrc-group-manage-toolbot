@@ -6,5 +6,6 @@ features:
   # 如果设置为 false，黑名单检查将被跳过，被封禁用户仍可正常使用机器人
   blacklist_enabled: true
 
-  # notify_enabled: true
-  # auto_welcome: false
+  # 欢迎消息系统总开关
+  # 如果设置为 false，即使群组设置了欢迎语，机器人也不会发送
+  welcome_enabled: true

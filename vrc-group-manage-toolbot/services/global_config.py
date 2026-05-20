@@ -42,6 +42,10 @@ class GlobalConfig:
         return self.features.get("blacklist_enabled", True)
 
     @property
+    def is_welcome_enabled(self) -> bool:
+        return self.features.get("welcome_enabled", True)
+
+    @property
     def verify_code_ttl(self) -> int:
         return self.binding_settings.get("verify_code_ttl", 180)
 

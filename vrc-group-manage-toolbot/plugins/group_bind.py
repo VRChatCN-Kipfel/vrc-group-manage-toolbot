@@ -3,15 +3,16 @@
 提供 QQ 群与 VRChat 群组的绑定管理功能
 """
 
-from nonebot import on_command, logger
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, Message
+from nonebot import on_command, on_notice, logger
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, PrivateMessageEvent, Message, NoticeEvent, GroupIncreaseNoticeEvent
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
 from utils import get_vrc_client
-from services.permission import get_permission_level, PermissionLevel
+from services.permission import get_permission_level, PermissionLevel, check_command_permission
 from services.group_config import group_config_store
 from services.message_utils import format_success, format_error, send_long_message
+from services.global_config import global_config
 
 
 # ── bindgroup ──
@@ -205,3 +206,106 @@ async def _handle_bind(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent,
         await bindgroup_cmd.finish(format_success(
             f"已将 QQ 群 {qq_group_id} 绑定到 VRChat 群组: {vrc_group_id}"
         ))
+
+
+welcome_cmd = on_command("welcome", priority=5, block=True)
+
+@welcome_cmd.handle()
+async def handle_welcome(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
+    # 仅群聊可用
+    if isinstance(event, PrivateMessageEvent):
+        await welcome_cmd.finish(format_error("此命令仅群聊可用"))
+    
+    qq_group_id = str(event.group_id)
+    text = args.extract_plain_text().strip()
+    parts = text.split(maxsplit=1)
+    subcmd = parts[0].lower() if parts else ""
+    
+    # 查询欢迎语：需要基础权限（默认 UNBOUND_USER，等级 0）
+    # 这样可以拦截黑名单用户，但允许普通成员查看
+    if not subcmd or subcmd == "status":
+        allowed, error_msg = await check_command_permission(bot, event, "welcome")
+        if not allowed:
+            await welcome_cmd.finish(error_msg)
+            
+        config = group_config_store.get(qq_group_id)
+        if not config.welcome_message:
+            await welcome_cmd.finish("当前群未设置欢迎消息")
+        
+        msg = f"📢 当前欢迎消息:\n{'='*20}\n{config.welcome_message}"
+        await send_long_message(welcome_cmd, msg)
+        return
+
+    allowed, error_msg = await check_command_permission(bot, event, "welcome_set")
+    if not allowed:
+        await welcome_cmd.finish(error_msg)
+
+    if subcmd == "set":
+        if len(parts) < 2:
+            await welcome_cmd.finish(format_error(
+                "请提供欢迎语内容",
+                "用法: #welcome set <内容>\n支持变量: {at}, {name}, {vrc_name}"
+            ))
+        
+        content = parts[1]
+        config = group_config_store.get(qq_group_id)
+        config.welcome_message = content
+        group_config_store.set(config)
+        
+        await welcome_cmd.finish(format_success("欢迎消息已更新"))
+    
+    # 4. 清空欢迎语
+    elif subcmd in ("clear", "delete", "remove"):
+        config = group_config_store.get(qq_group_id)
+        if not config.welcome_message:
+            await welcome_cmd.finish("当前群未设置欢迎消息，无需清空")
+        
+        config.welcome_message = None
+        group_config_store.set(config)
+        
+        await welcome_cmd.finish(format_success("欢迎消息已清空"))
+    
+    else:
+        await welcome_cmd.finish(format_error(
+            "未知子命令",
+            "用法:\n#welcome - 查看当前设置\n#welcome set <内容> - 设置欢迎语\n#welcome clear - 清空欢迎语"
+        ))
+
+
+# ── 欢迎消息监听器 ──
+
+@on_notice(priority=5, block=False)
+async def handle_group_increase(bot: Bot, event: NoticeEvent):
+    """监听群成员增加事件并发送欢迎消息"""
+    if not isinstance(event, GroupIncreaseNoticeEvent):
+        return
+
+    if not global_config.is_welcome_enabled:
+        return
+    
+    qq_group_id = str(event.group_id)
+    user_id = str(event.user_id)
+
+    config = group_config_store.get(qq_group_id)
+    welcome_msg = config.welcome_message
+
+    if not welcome_msg:
+        return
+    
+    try:
+        member_info = await bot.get_group_member_info(group_id=event.group_id, user_id=event.user_id)
+        nickname = member_info.get("card") or member_info.get("nickname") or "新成员"
+
+        from services.user_binding import user_binding_store
+        binding = user_binding_store.get_by_qq(user_id)
+        vrc_name = binding.vrc_display_name if binding else "未绑定"
+
+        final_msg = welcome_msg.replace("{at}", f"[CQ:at,qq={user_id}]")
+        final_msg = final_msg.replace("{name}", nickname)
+        final_msg = final_msg.replace("{vrc_name}", vrc_name)
+
+        await bot.send_group_msg(group_id=event.group_id, message=final_msg)
+        logger.info(f"已向群 {qq_group_id} 的新成员 {user_id} 发送欢迎消息")
+        
+    except Exception as e:
+        logger.error(f"发送欢迎消息失败: {e}")

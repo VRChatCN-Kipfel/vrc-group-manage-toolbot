@@ -39,6 +39,8 @@ COMMAND_DEFAULTS = {
     "gannounce": {"enabled": False, "permission": PermissionLevel.OWNER},
     "gdelannounce": {"enabled": False, "permission": PermissionLevel.OWNER},
     "gaudit": {"enabled": False, "permission": PermissionLevel.OWNER},
+    "welcome": {"enabled": True, "permission": PermissionLevel.UNBOUND_USER},
+    "welcome_set": {"enabled": True, "permission": PermissionLevel.BOUND_ADMIN},
     
     # Bot 配置管理子命令
     "bot_blacklist": {"enabled": True, "permission": PermissionLevel.SUPERUSER},  #bot blacklist 子命令（注意！该值设为3以下的数值将不会生效！）
@@ -60,6 +62,7 @@ class GroupConfig(BaseModel):
     notify_enabled: bool = False
     admin_ops_enabled: bool = True
     allow_user_bind: bool = True
+    welcome_message: Optional[str] = None  # 欢迎语，为空则不发送
     
     # 命令配置：command_name -> CommandConfig
     commands: Dict[str, CommandConfig] = Field(default_factory=dict)
