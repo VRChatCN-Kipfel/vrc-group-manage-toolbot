@@ -5,6 +5,8 @@ from typing import Optional
 from pydantic import BaseModel
 from nonebot import logger
 from nonebot_plugin_localstore import get_data_dir
+from .global_config import global_config
+from .scheduler_service import scheduler_service
 
 
 class BindingRecord(BaseModel):
@@ -58,5 +60,43 @@ class UserBindingStore:
         self._bindings.pop(str(qq_id), None)
         self._save()
 
+    def cleanup_expired(self):
+        """清理已过期的未确认绑定记录"""
+        if not global_config.is_auto_cleanup_enabled:
+            return
+        
+        now = time.time()
+        expired_qqs = []
+        for qq_id, binding in self._bindings.items():
+            if not binding.confirmed and binding.verify_code_expires and now > binding.verify_code_expires:
+                expired_qqs.append(qq_id)
+        
+        for qq_id in expired_qqs:
+            del self._bindings[qq_id]
+            logger.info(f"自动清理过期绑定记录: {qq_id}")
+        
+        if expired_qqs:
+            self._save()
+            logger.info(f"共清理 {len(expired_qqs)} 条过期绑定记录")
+
 
 user_binding_store = UserBindingStore()
+
+# --- 自动注册清理任务 ---
+def _register_cleanup_task():
+    if global_config.is_auto_cleanup_enabled:
+        interval = global_config.cleanup_interval
+        try:
+            scheduler_service.add_interval_task(
+                func=user_binding_store.cleanup_expired,
+                seconds=interval,
+                task_id="cleanup_expired_bindings",
+                force_replace=True
+            )
+            logger.info(f"[UserBinding] 已注册定期清理任务，间隔: {interval}秒")
+        except Exception as e:
+            logger.error(f"[UserBinding] 注册清理任务失败: {e}")
+    else:
+        logger.info("[UserBinding] 自动清理功能已在配置中禁用")
+
+_register_cleanup_task()

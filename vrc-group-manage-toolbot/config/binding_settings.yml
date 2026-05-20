@@ -1,0 +1,15 @@
+# 用户绑定与清理策略配置
+# 用于管理绑定记录的有效期和自动清理行为
+
+binding:
+  # 待验证绑定的过期时间（单位：秒）
+  # 用户在发送 /bind 后，必须在此时间内完成 /confirm 验证
+  verify_code_ttl: 180
+
+  # 是否启用自动清理机制
+  # 如果为 true，机器人将在启动或定期检查时删除已过期的未确认绑定记录
+  auto_cleanup_enabled: true
+
+  # 清理检查间隔（单位：秒）
+  # 仅当 auto_cleanup_enabled 为 true 时生效
+  cleanup_interval: 3600

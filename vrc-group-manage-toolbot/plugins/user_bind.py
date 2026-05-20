@@ -13,6 +13,7 @@ from services.api_guard import api_guard
 from services.permission import PermissionLevel, check_command_permission
 from services.user_binding import user_binding_store, BindingRecord
 from services.message_utils import format_success, format_error, send_long_message
+from services.global_config import global_config
 
 
 def generate_verify_code(length: int = 6) -> str:
@@ -130,7 +131,7 @@ async def handle_bind(bot: Bot, event: GroupMessageEvent, args: Message = Comman
         bound_at=time.time(),
         confirmed=False,
         verify_code=code,
-        verify_code_expires=time.time() + 180,
+        verify_code_expires=time.time() + global_config.verify_code_ttl,
     )
     user_binding_store.set(pending)
 

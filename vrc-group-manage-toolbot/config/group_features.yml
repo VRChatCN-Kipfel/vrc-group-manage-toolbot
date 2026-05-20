@@ -1,0 +1,10 @@
+# 群组功能特性开关配置
+# 用于控制机器人各模块的全局启用状态
+
+features:
+  # 黑名单系统总开关
+  # 如果设置为 false，黑名单检查将被跳过，被封禁用户仍可正常使用机器人
+  blacklist_enabled: true
+
+  # notify_enabled: true
+  # auto_welcome: false

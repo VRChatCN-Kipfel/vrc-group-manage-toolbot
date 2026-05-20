@@ -197,6 +197,8 @@ class BlacklistStore:
 blacklist_store = BlacklistStore()
 
 
+from .global_config import global_config
+
 async def get_permission_level(bot: Bot, event: MessageEvent) -> PermissionLevel:
     from .user_binding import user_binding_store
     
@@ -204,8 +206,8 @@ async def get_permission_level(bot: Bot, event: MessageEvent) -> PermissionLevel
     sender = event.sender
     qq_id = str(user_id)
     
-    # -1. 检查是否在黑名单中（最高优先级）
-    if blacklist_store.is_blacklisted(qq_id):
+    # -1. 检查是否在黑名单中（最高优先级，受全局配置控制）
+    if global_config.is_blacklist_enabled and blacklist_store.is_blacklisted(qq_id):
         return PermissionLevel.BANNED_USER
     
     # 0. 检查是否有临时设定的权限 (优先级最高)
