@@ -207,6 +207,7 @@ async def _handle_bind(bot: Bot, event: GroupMessageEvent | PrivateMessageEvent,
             f"已将 QQ 群 {qq_group_id} 绑定到 VRChat 群组: {vrc_group_id}"
         ))
 
+# ── webcome ──
 
 welcome_cmd = on_command("welcome", priority=5, block=True)
 
@@ -272,8 +273,6 @@ async def handle_welcome(bot: Bot, event: GroupMessageEvent, args: Message = Com
         ))
 
 
-# ── 欢迎消息监听器 ──
-
 @on_notice(priority=5, block=False)
 async def handle_group_increase(bot: Bot, event: NoticeEvent):
     """监听群成员增加事件并发送欢迎消息"""
@@ -291,6 +290,18 @@ async def handle_group_increase(bot: Bot, event: NoticeEvent):
 
     if not welcome_msg:
         return
+
+    from services.permission import get_permission_level
+    level = await get_permission_level(bot, event)
+    required_level = config.get_command_permission("welcome")
+
+    if level < required_level:
+        logger.debug(f"拦截权限不足用户 {user_id} (当前: {level}, 要求: {required_level}) 的欢迎消息发送")
+        return
+
+    if not config.is_command_enabled("welcome"):
+        logger.debug(f"群 {qq_group_id} 已禁用 welcome 功能，跳过发送")
+        return
     
     try:
         member_info = await bot.get_group_member_info(group_id=event.group_id, user_id=event.user_id)
@@ -305,7 +316,7 @@ async def handle_group_increase(bot: Bot, event: NoticeEvent):
         final_msg = final_msg.replace("{vrc_name}", vrc_name)
 
         await bot.send_group_msg(group_id=event.group_id, message=final_msg)
-        logger.info(f"已向群 {qq_group_id} 的新成员 {user_id} 发送欢迎消息")
+        logger.info(f"已向群 {qq_group_id} 的新成员 {user_id} (权限等级: {level}) 发送欢迎消息")
         
     except Exception as e:
         logger.error(f"发送欢迎消息失败: {e}")
