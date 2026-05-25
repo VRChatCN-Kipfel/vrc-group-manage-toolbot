@@ -607,6 +607,70 @@ async def handle_command(bot: Bot, event: MessageEvent):
     # 执行操作
 ```
 
+## 配置热重载与计划任务
+
+### 概念
+
+`ConfigReloadService` 通过轮询 `config/` 目录下 `*.yml` / `*.yaml` 文件的 mtime 检测配置变更。变更后自动触发重载，插件只需订阅回调，在回调中根据最新 `global_config` 重新注册/移除计划任务。
+
+### 设计保证
+
+| 保证 | 机制 |
+|------|------|
+| 新旧配置不会同时生效 | `global_config.reload()` 原子赋值 → 插件回调中按新配置注册 |
+| 无资源泄露 | 回调中先 remove_task 旧任务再注册新任务 |
+| 异步竞态安全 | `asyncio.Lock` 串行化重载流程 |
+| 回调顺序 | `global_config.reload` 观察者用 `first=True` 插在队首，确保配置先更新再触发任务注册 |
+
+### 插件添加配置热重载任务的标准模式
+
+```python
+# 在你的插件/服务模块中
+from services.scheduler_service import scheduler_service
+from services.global_config import global_config
+from services.config_reload import config_reload_service
+
+async def my_periodic_task():
+    logger.info("执行定期任务...")
+
+def _register_my_task():
+    if global_config.features.get("my_feature_enabled", True):
+        scheduler_service.add_interval_task(
+            func=my_periodic_task,
+            seconds=global_config.binding_settings.get("my_interval", 300),
+            task_id="my_plugin_task",
+            force_replace=True,
+        )
+    else:
+        try:
+            scheduler_service.remove_task("my_plugin_task")
+        except Exception:
+            pass
+
+# 首次注册
+_register_my_task()
+
+# 订阅配置热重载：配置变更后自动重新注册
+config_reload_service.subscribe(lambda gen: _register_my_task())
+```
+
+> ⚠️ **注意**：`_register_my_task` 必须在其中读取最新的 `global_config` 值，不要在模块顶层缓存配置参数。
+
+### 手动触发热重载
+
+配置变更后会自动检测并重载。也可以通过 Hook 手动触发：
+
+```python
+from services.config_reload import config_reload_service
+
+# 手动触发（调试用）
+await config_reload_service.trigger_reload()
+```
+
+### 配置监控机制
+
+`ConfigReloadService` 通过轮询 `config/` 目录下 `*.yml` 和 `*.yaml` 文件的修改时间（mtime）来检测变更。检测到变化后有 1 秒去抖延迟，防止编辑器多次写入触发多次重载。
+
 ## 常见问题
 
 ### Q1: 任务没有执行怎么办？
