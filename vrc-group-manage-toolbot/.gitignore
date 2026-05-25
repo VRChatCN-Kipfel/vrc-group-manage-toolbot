@@ -8,3 +8,7 @@ __pycache__/
 # HTML 渲染测试文件
 test_output_*.png
 cache/
+
+# 测试与覆盖率
+.coverage
+.pytest_cache/

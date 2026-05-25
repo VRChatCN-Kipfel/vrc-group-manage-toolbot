@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["."]
+addopts = "-p no:nonebug"
+
+[tool.coverage.run]
+source = ["../"]
+omit = ["__init__.py", "conftest.py"]
