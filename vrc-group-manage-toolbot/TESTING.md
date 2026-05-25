@@ -88,6 +88,52 @@
 
 ---
 
+### 配置热重载服务 🔄
+
+| 功能 | 测试 | 结果 |
+|------|------|------|
+| ConfigReloadService 构造 | 单元 `test_construction_generation_zero` | ✅ |
+| generation 初始值 | 单元 `test_construction_has_observers_empty` | ✅ |
+| subscribe 注册回调 | 单元 `test_subscribe_adds_observer` | ✅ |
+| subscribe 去重 | 单元 `test_subscribe_dedup` | ✅ |
+| unsubscribe 移除 | 单元 `test_unsubscribe_removes_observer` | ✅ |
+| unsubscribe 不存在容错 | 单元 `test_unsubscribe_nonexistent_no_error` | ✅ |
+| trigger_reload 递增 generation | 单元 `test_trigger_reload_increments_generation` | ✅ |
+| 多观察者按注册顺序通知 | 单元 `test_multiple_observers_notified_in_order` | ✅ |
+| 单个观察者异常不阻断其他 | 单元 `test_one_observer_failure_does_not_block_others` | ✅ |
+| asyncio.Lock 串行化并发重载 | 单元 `test_reload_lock_serializes_concurrent_triggers` | ✅ |
+| start_watching 创建监控 task | 单元 `test_start_watching_creates_task` | ✅ |
+| stop_watching 取消监控 task | 单元 `test_stop_watching_cancels_task` | ✅ |
+| _has_changes 检测新文件 | 单元 `test_has_changes_new_file_detected` | ✅ |
+| _has_changes 空目录容错 | 单元 `test_has_changes_empty_dir_no_error` | ✅ |
+| subscribe(first=True) 插队首 | 单元 `test_subscribe_first_inserts_at_head` | ✅ |
+
+### 全局配置热重载 🔄
+
+| 功能 | 测试 | 结果 |
+|------|------|------|
+| 加载默认配置 | 单元 `test_load_default_config` | ✅ |
+| verify_code_ttl 默认值 | 单元 `test_verify_code_ttl_default` | ✅ |
+| cleanup_interval 默认值 | 单元 `test_cleanup_interval_default` | ✅ |
+| reload() 原子替换 features | 单元 `test_reload_atomic_swap_features` | ✅ |
+| reload() 原子替换 binding_settings | 单元 `test_reload_atomic_swap_binding` | ✅ |
+| 缺失 YAML 文件 reload 不崩溃 | 单元 `test_reload_missing_file_no_crash` | ✅ |
+| 损坏 YAML reload 不崩溃 | 单元 `test_reload_corrupted_yaml_no_crash` | ✅ |
+| _lock 保护 reload 串行化 | 单元 `test_reload_lock_protects_concurrent` | ✅ |
+| 属性读取不被锁阻塞 | 单元 `test_property_reads_not_blocked_by_lock` | ✅ |
+
+### 调度器核心 API 🔄
+
+| 功能 | 测试 | 结果 |
+|------|------|------|
+| force_replace 覆盖已存在任务 | 单元 `test_add_interval_task_with_force_replace` | ✅ |
+| 重复注册抛 TaskAlreadyExistsError | 单元 `test_add_interval_task_duplicate_raises` | ✅ |
+| 移除不存在任务抛 JobLookupError | 单元 `test_remove_task_raises_job_lookup_error` | ✅ |
+| 获取不存在任务返回 None | 单元 `test_get_task_info_returns_none_for_missing` | ✅ |
+| 无 ManagedTaskRegistry 残留 | 单元 `test_no_managed_task_registry` | ✅ |
+
+---
+
 ## 未测试（完整清单）
 
 ### `#bot` 子命令 (12 项 → 6 项待测)
@@ -181,14 +227,45 @@
 | 8.4 | `#bot permission 不存在命令 0` | 未知命令提示 |
 | 8.5 | Cookie 直登 `#vrclLogin cookie=xxx` | ⚠️ 已知跨域问题 |
 
+### 配置热重载集成测试 (7 项，需 NoneBot 运行时)
+
+| # | 场景 | 验证点 |
+|---|------|--------|
+| 9.1 | 启动后 `cleanup_expired_bindings` 任务已注册 | `scheduler_service.get_task_info("cleanup_expired_bindings")` 非 None |
+| 9.2 | 启动后 config_reload_service 监控已启动 | `_watcher_task` 非 None 且未 done |
+| 9.3 | `auto_cleanup_enabled=false` 启动不注册任务 | 清理任务不存在 |
+| 9.4 | 修改 `cleanup_interval` 后任务间隔更新 | 改为 7200 → 重载后间隔 ≈ 7200s |
+| 9.5 | `auto_cleanup_enabled: false` 后任务被移除 | 重载后 `get_task_info` 返回 None |
+| 9.6 | 重新启用后任务被重新注册 | false → true → 重载后任务非 None |
+| 9.7 | `group_features.yml` 修改非 binding 字段 | welcome_enabled 改变，托管任务不变，但 global_config 已更新 |
+
+### 配置热重载场景测试 (6 项，需 NoneBot 运行时)
+
+| # | 场景 | 验证点 |
+|---|------|--------|
+| 10.1 | 1 秒内连续修改 3 次 YAML | 只触发 1 次重载（去抖） |
+| 10.2 | 间隔 6 秒的两次修改 | 触发 2 次重载 |
+| 10.3 | 写入语法错误的 YAML | 日志报错，旧配置值保留，托管任务不中断 |
+| 10.4 | 监控循环内部异常不崩溃 | 日志记录后继续轮询 |
+| 10.5 | 手动 `trigger_reload()` 与自动监控并发 | `_reload_lock` 保证串行 |
+| 10.6 | 重载期间新任务未被提前触发 | factory 完成前不执行 |
+
+### 配置热重载关闭链路 (2 项，需 NoneBot 运行时)
+
+| # | 场景 | 验证点 |
+|---|------|--------|
+| 11.1 | shutdown 后监控 task 已 cancel | `watcher_task.cancelled() == True` |
+| 11.2 | shutdown 后调度器已停止 | `scheduler.running == False` |
+
 ---
 
 ## 统计
 
 | 状态 | 数量 |
 |------|------|
-| ✅ 已测通过 | 25 |
-| ❌ 未测试 | **44** |
+| ✅ 已完成测试 | 54 (功能集成 25 + 热重载单元 29) |
+| ❌ 未测试 (功能) | **44** |
+| ❌ 未测试 (热重载集成/场景) | **15** |
 | ⚠️ 已知问题 | 1 (Cookie 直登跨域) |
 
 ### 未测试按模块分布
@@ -203,6 +280,9 @@
 | 查询命令 | 3 |
 | 命令开关联动 | 4 |
 | 边界测试 | 5 |
+| 配置热重载集成 | 7 |
+| 配置热重载场景 | 6 |
+| 配置热重载关闭链路 | 2 |
 | 长稳/并发/多群 | 6 (未纳入计数) |
 
 ---
@@ -227,4 +307,6 @@
 2. **第二阶段**（权限系统）: 临时权限设置 → 优先级 → 清除 → 重启清空
 3. **第三阶段**（群管理）: `#gmembers` → `#grole` → `#grequests` → `#ban/kick`
 4. **第四阶段**（安全边界）: 私聊拒绝 → 非超管拒绝 → 旧格式兼容
-5. **第五阶段**（长稳）: Bot 持续运行 24h+
+5. **第五阶段**（配置热重载集成）: 启动链路验证 → 修改 YAML 验证热重载 → 关闭链路验证
+6. **第六阶段**（配置热重载场景）: 去抖 → 异常容错 → 并发重载
+7. **第七阶段**（长稳）: Bot 持续运行 24h+
