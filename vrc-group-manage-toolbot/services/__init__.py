@@ -5,6 +5,7 @@ from .user_binding import BindingRecord, UserBindingStore, user_binding_store
 from .group_config import GroupConfig, GroupConfigStore, group_config_store, CommandConfig, COMMAND_DEFAULTS
 from .scheduler_service import SchedulerService, scheduler_service
 from .global_config import global_config
+from .config_reload import ConfigReloadService, config_reload_service
 
 __all__ = [
     "ApiGuard", "api_guard",
@@ -14,4 +15,5 @@ __all__ = [
     "GroupConfig", "GroupConfigStore", "group_config_store", "CommandConfig", "COMMAND_DEFAULTS",
     "SchedulerService", "scheduler_service",
     "global_config",
+    "ConfigReloadService", "config_reload_service",
 ]

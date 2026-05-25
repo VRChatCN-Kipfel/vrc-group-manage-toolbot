@@ -2,11 +2,11 @@ import nonebot
 from nonebot.adapters.onebot.v11 import Adapter
 from nonebot import get_driver, logger
 from services.scheduler_service import scheduler_service
+from services.global_config import global_config
+from services.config_reload import config_reload_service
 
-# 初始化 NoneBot
 nonebot.init()
 
-# 注册适配器
 driver = get_driver()
 driver.register_adapter(Adapter)
 
@@ -15,8 +15,17 @@ driver.register_adapter(Adapter)
 async def _startup():
     scheduler_service.start_scheduler()
 
+    async def on_config_reload(generation: int):
+        await global_config.reload()
+        logger.info(f"配置热重载完成 generation={generation}")
+
+    config_reload_service.subscribe(on_config_reload, first=True)
+    config_reload_service.start_watching()
+
+
 @driver.on_shutdown
 async def _shutdown():
+    config_reload_service.stop_watching()
     from utils import get_vrc_client
     await get_vrc_client().close()
     scheduler_service.shutdown_scheduler()
